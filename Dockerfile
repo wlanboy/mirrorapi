@@ -11,9 +11,6 @@ COPY main.py /app/
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Machen Sie das Shell-Skript ausführbar
-RUN chmod +x create.sh
-
 # Geben Sie den Port an, den die Anwendung verwendet
 EXPOSE 4500
 
