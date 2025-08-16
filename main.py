@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify, make_response
 import time
 import logging
+import signal
+import sys
 #from waitress import serve
 #from paste.translogger import TransLogger
 
@@ -9,6 +11,13 @@ logger = logging.getLogger('waitress')
 logger.setLevel(logging.DEBUG)
 
 app = Flask(__name__)
+
+def handle_sigterm(signal, frame):
+    print("SIGTERM received. Shutting down gracefully...")
+    print("Cleanup complete. Exiting.")
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, handle_sigterm)
 
 @app.route('/request', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
 def handle_request():
