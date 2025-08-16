@@ -1,5 +1,12 @@
 from flask import Flask, request, jsonify, make_response
 import time
+import logging
+#from waitress import serve
+#from paste.translogger import TransLogger
+
+logging.basicConfig()
+logger = logging.getLogger('waitress')
+logger.setLevel(logging.DEBUG)
 
 app = Flask(__name__)
 
@@ -62,3 +69,4 @@ def handle_request():
 
 if __name__ == '__main__':
     app.run(debug=False, port=4500)
+    #serve(TransLogger(app, setup_console_handler=True), host='0.0.0.0', port=4500, threads=2, expose_tracebacks=False)
