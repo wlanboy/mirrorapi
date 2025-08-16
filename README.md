@@ -30,7 +30,7 @@ docker run --rm -p 4500:4500 mirrorapi
 
 ## Docker run daemon
 ```
-docker run --name caweb -d -p 4500:4500 --restart unless-stopped mirrorapi
+docker run --name mirrorapi -d -p 4500:4500 --restart unless-stopped wlanboy/mirrorapi
 ```
 
 ## Usage
