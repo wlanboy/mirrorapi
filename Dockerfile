@@ -5,7 +5,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Kopieren Sie die Anwendungsdateien in das Arbeitsverzeichnis
-COPY main.py /app/
+COPY *.py /app/
 
 # Installieren Sie die benötigten Python-Abhängigkeiten
 COPY requirements.txt .
