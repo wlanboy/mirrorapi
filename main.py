@@ -1,16 +1,30 @@
 from flask import Flask, request, jsonify, make_response
-import time
+from flask_smorest import Api
 import logging
-import signal
 import sys
-#from waitress import serve
-#from paste.translogger import TransLogger
+import signal
+import time
+from swagger import configure_swagger_ui
+from header_api import header_blp
+from query_api import query_blp
 
 logging.basicConfig()
 logger = logging.getLogger('waitress')
 logger.setLevel(logging.DEBUG)
 
 app = Flask(__name__)
+app.config["API_TITLE"] = "Mirror Echo API"
+app.config["API_VERSION"] = "v1"
+app.config["OPENAPI_VERSION"] = "3.0.2"
+app.config["OPENAPI_URL_PREFIX"] = "/swagger-ui"
+app.config["OPENAPI_SWAGGER_UI_URL"] = "https://cdn.jsdelivr.net/npm/swagger-ui-dist/"
+
+api = Api(app)
+api.register_blueprint(header_blp)
+api.register_blueprint(query_blp)
+
+# --- 5. Swagger UI Configuration ---
+configure_swagger_ui(app)
 
 def handle_sigterm(signal, frame):
     print("SIGTERM received. Shutting down gracefully...")
