@@ -114,6 +114,17 @@ def handle_path_request(options):
 
     return process_request_logic(**path_params)
 
+@app.route('/')
+def info_page():
+    return f"""
+    <html>
+    <body style="background-color:#121212; color:#e0e0e0; font-family:sans-serif;">
+    <h3 style="color:#bb86fc;">Application Information</h3>
+    <p><strong>OpenAPI URL:</strong> <a href="/swagger-ui" style="color:#BB86FC;">/swagger-ui</a></p>
+    </body>
+    </html>
+    """
+
 if __name__ == '__main__':
     app.run(debug=False, port=4500)
     #serve(TransLogger(app, setup_console_handler=True), host='0.0.0.0', port=4500, threads=2, expose_tracebacks=False)
