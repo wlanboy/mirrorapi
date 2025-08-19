@@ -7,6 +7,7 @@ import time
 from swagger import configure_swagger_ui
 from header_api import header_blp
 from query_api import query_blp
+from mirror_api import mirror_blp, create_mirror_table
 
 logging.basicConfig()
 logger = logging.getLogger('waitress')
@@ -22,9 +23,13 @@ app.config["OPENAPI_SWAGGER_UI_URL"] = "https://cdn.jsdelivr.net/npm/swagger-ui-
 api = Api(app)
 api.register_blueprint(header_blp)
 api.register_blueprint(query_blp)
+api.register_blueprint(mirror_blp)
 
 # --- 5. Swagger UI Configuration ---
 configure_swagger_ui(app)
+
+# --- 6. Check DB Schema ---
+create_mirror_table() 
 
 def handle_sigterm(signal, frame):
     print("SIGTERM received. Shutting down gracefully...")
@@ -126,5 +131,6 @@ def info_page():
     """
 
 if __name__ == '__main__':
-    app.run(debug=False, port=4500)
+    create_mirror_table() 
+    app.run(debug=True, port=4500)
     #serve(TransLogger(app, setup_console_handler=True), host='0.0.0.0', port=4500, threads=2, expose_tracebacks=False)

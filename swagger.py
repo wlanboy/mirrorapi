@@ -31,6 +31,19 @@ class EchoResponseSchema(Schema):
 class ErrorResponseSchema(Schema):
     error = fields.String(required=True)
 
+class MirrorRequestSchema(Schema):
+    request_data = fields.Raw(required=True, metadata={"description": "The incoming request body to be matched."})
+class MirrorResponseSchema(Schema):
+    response_data = fields.Raw(required=True, metadata={"description": "The desired response to be returned."})
+    response_status = fields.Integer(required=True, metadata={"description": "The HTTP status code of the response.", "example": 200})
+
+class MirrorSaveSchema(Schema):
+    request = fields.Nested(MirrorRequestSchema, required=True, metadata={"description": "The request data to be saved as key."})
+    response = fields.Nested(MirrorResponseSchema, required=True, metadata={"description": "The response data to be saved as value."})
+
+class MirrorDeleteSchema(Schema):
+    request = fields.Nested(MirrorRequestSchema, required=True, metadata={"description": "The request data to be matched for deletion."})
+
 # Function to configure and register the Swagger UI
 def configure_swagger_ui(app):
     """
