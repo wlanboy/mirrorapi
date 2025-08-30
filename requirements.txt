@@ -14,11 +14,16 @@ flask==3.1.1
     # via
     #   mirrorapi (pyproject.toml)
     #   flask-smorest
+    #   flask-sqlalchemy
     #   flask-swagger-ui
 flask-smorest==0.46.1
     # via mirrorapi (pyproject.toml)
+flask-sqlalchemy==3.1.1
+    # via mirrorapi (pyproject.toml)
 flask-swagger-ui==5.21.0
     # via mirrorapi (pyproject.toml)
+greenlet==3.2.4
+    # via sqlalchemy
 idna==3.10
     # via requests
 itsdangerous==2.2.0
@@ -41,6 +46,10 @@ packaging==25.0
     #   webargs
 requests==2.32.4
     # via mirrorapi (pyproject.toml)
+sqlalchemy==2.0.43
+    # via flask-sqlalchemy
+typing-extensions==4.15.0
+    # via sqlalchemy
 urllib3==2.5.0
     # via requests
 waitress==3.0.2
