@@ -1,34 +1,22 @@
-import sqlite3
-import json
+from flask_sqlalchemy import SQLAlchemy
 from flask import request, jsonify, make_response
 from flask_smorest import Blueprint
 from swagger import MirrorSaveSchema, MirrorDeleteSchema
+import json
 
 mirror_blp = Blueprint(
     "mirror", __name__, url_prefix="/mirror", description="Manages and serves mirrored request/response pairs."
 )
 
-DB_PATH = "mirror_data.db"
+db = SQLAlchemy()
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-def create_mirror_table():
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS mirror_pairs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            request_hash TEXT UNIQUE,
-            request_data TEXT,
-            response_data TEXT,
-            response_status INTEGER
-        )
-    """)
-    conn.commit()
-    conn.close()
+class MirrorPair(db.Model):
+    __tablename__ = 'mirror_pairs'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    request_hash = db.Column(db.String, unique=True, nullable=False)
+    request_data = db.Column(db.Text, nullable=False)
+    response_data = db.Column(db.Text, nullable=False)
+    response_status = db.Column(db.Integer, nullable=False)
 
 def hash_request(request_data):
     """Generates a consistent hash from the request body."""
@@ -46,19 +34,21 @@ def mirror_save(data):
     response_status = data["response"]["response_status"]
     request_hash = hash_request(request_data)
 
-    conn = get_db()
-    cursor = conn.cursor()
     try:
-        cursor.execute(
-            "INSERT INTO mirror_pairs (request_hash, request_data, response_data, response_status) VALUES (?, ?, ?, ?)",
-            (request_hash, json.dumps(request_data), json.dumps(response_data), response_status)
+        pair = MirrorPair(
+            request_hash=request_hash,
+            request_data=json.dumps(request_data),
+            response_data=json.dumps(response_data),
+            response_status=response_status
         )
-        conn.commit()
+        db.session.add(pair)
+        db.session.commit()
         return {"message": "Request/Response pair saved."}, 201
-    except sqlite3.IntegrityError:
-        return {"error": "A pair with this request already exists."}, 409
-    finally:
-        conn.close()
+    except Exception as e:
+        db.session.rollback()
+        if 'UNIQUE constraint' in str(e):
+            return {"error": "A pair with this request already exists."}, 409
+        return {"error": str(e)}, 500
 
 @mirror_blp.route("/delete", methods=["POST"])
 @mirror_blp.doc(requestBody={"content": {"application/json": {"schema": {}}}})
@@ -75,15 +65,11 @@ def mirror_delete():
     # Manuelle Verarbeitung des Request-Bodys
     request_hash = hash_request(request_data)
 
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM mirror_pairs WHERE request_hash = ?", (request_hash,))
-    conn.commit()
-    rows_deleted = cursor.rowcount
-    conn.close()
-
-    if rows_deleted == 0:
+    pair = MirrorPair.query.filter_by(request_hash=request_hash).first()
+    if not pair:
         return {"error": "No matching pair found to delete."}, 404
+    db.session.delete(pair)
+    db.session.commit()
     return {"message": "Pair deleted successfully."}, 200
 
 @mirror_blp.route("/", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
@@ -103,17 +89,10 @@ def mirror_lookup():
 
     request_hash = hash_request(request_data)
 
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT response_data, response_status FROM mirror_pairs WHERE request_hash = ?", (request_hash,))
-    result = cursor.fetchone()
-    conn.close()
-
-    if not result:
+    pair = MirrorPair.query.filter_by(request_hash=request_hash).first()
+    if not pair:
         return {"error": "No mirrored response found for this request."}, 404
-    
-    response_data = json.loads(result['response_data'])
-    response_status = result['response_status']
-
+    response_data = json.loads(pair.response_data)
+    response_status = pair.response_status
     response = make_response(jsonify(response_data), response_status)
     return response
