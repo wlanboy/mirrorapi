@@ -7,13 +7,15 @@ import time
 from swagger import configure_swagger_ui
 from header_api import header_blp
 from query_api import query_blp
-from mirror_api import mirror_blp, create_mirror_table
+from mirror_api import mirror_blp, db
 
 logging.basicConfig()
 logger = logging.getLogger('waitress')
 logger.setLevel(logging.DEBUG)
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mirror_data.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config["API_TITLE"] = "Mirror Echo API"
 app.config["API_VERSION"] = "v1"
 app.config["OPENAPI_VERSION"] = "3.0.2"
@@ -28,8 +30,9 @@ api.register_blueprint(mirror_blp)
 # --- 5. Swagger UI Configuration ---
 configure_swagger_ui(app)
 
-# --- 6. Check DB Schema ---
-create_mirror_table() 
+db.init_app(app)
+with app.app_context():
+    db.create_all()
 
 def handle_sigterm(signal, frame):
     print("SIGTERM received. Shutting down gracefully...")
@@ -131,6 +134,5 @@ def info_page():
     """
 
 if __name__ == '__main__':
-    create_mirror_table() 
-    app.run(debug=True, port=4500)
+    app.run(debug=True, host="0.0.0.0", port=4501)
     #serve(TransLogger(app, setup_console_handler=True), host='0.0.0.0', port=4500, threads=2, expose_tracebacks=False)
