@@ -24,6 +24,9 @@ class EchoQuerySchema(Schema):
             data["statuscode"] = 500
         return data
 
+class EchoBodySchema(Schema):
+    body = fields.Raw(metadata={"description": "Beliebiger JSON-Body, wird zurückgespiegelt"})
+
 class EchoResponseSchema(Schema):
     received_headers = fields.Dict(required=True)
     received_body = fields.Raw()
