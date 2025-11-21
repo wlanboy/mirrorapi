@@ -2,6 +2,8 @@
 #    uv pip compile pyproject.toml -o requirements.txt
 apispec==6.8.2
     # via flask-smorest
+behave==1.3.3
+    # via mirrorapi (pyproject.toml)
 blinker==1.9.0
     # via flask
 certifi==2025.8.3
@@ -10,6 +12,12 @@ charset-normalizer==3.4.3
     # via requests
 click==8.2.1
     # via flask
+colorama==0.4.6
+    # via behave
+cucumber-expressions==18.0.1
+    # via behave
+cucumber-tag-expressions==8.0.0
+    # via behave
 flask==3.1.1
     # via
     #   mirrorapi (pyproject.toml)
@@ -44,8 +52,18 @@ packaging==25.0
     # via
     #   apispec
     #   webargs
+parse==1.20.2
+    # via
+    #   behave
+    #   parse-type
+parse-type==0.6.6
+    # via behave
 requests==2.32.4
     # via mirrorapi (pyproject.toml)
+six==1.17.0
+    # via
+    #   behave
+    #   parse-type
 sqlalchemy==2.0.43
     # via flask-sqlalchemy
 typing-extensions==4.15.0
