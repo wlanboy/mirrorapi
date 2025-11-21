@@ -3,11 +3,6 @@ from behave import given, when, then
 
 BASE_URL = "http://localhost:4500"
 
-@given("the API is running")
-def step_impl(context):
-    # Optional: Healthcheck
-    pass
-
 @when('I send a POST request to "{path}" with body:')
 def step_impl(context, path):
     context.response = requests.post(
