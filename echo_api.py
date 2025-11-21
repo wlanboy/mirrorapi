@@ -23,6 +23,7 @@ def handle_path_request(body, options):
                 path_params['wait_time'] = int(value)
             elif key == 'errorcode':
                 path_params['error_message'] = value
+                path_params['status_code'] = 500
 
     # Body wird automatisch als dict übergeben
     return process_request_logic(**path_params)
