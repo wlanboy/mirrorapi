@@ -5,7 +5,7 @@ from header_api import process_request_logic
 
 # --- Query Parameter-based API Blueprint ---
 query_blp = Blueprint(
-    "echo", __name__, url_prefix="/echo", description="API controlled by query parameters."
+    "query", __name__, url_prefix="/echo", description="API controlled by query parameters."
 )
 
 @query_blp.route("/", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
