@@ -17,6 +17,7 @@ persistence:
 istio:
   host: mirrorapi.tp.lan
   gateway: mirrorapi-gateway
+  gatewayNamespace: "istio-ingress"
 
 certmanager:
   issuer: local-ca-issuer
