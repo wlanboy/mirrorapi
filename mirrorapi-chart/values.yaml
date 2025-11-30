@@ -1,0 +1,23 @@
+replicaCount: 1
+deploymentName: mirrorapi
+
+image:
+  repository: wlanboy/mirrorapi
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  port: 4500
+
+persistence:
+  enabled: true
+  size: 100Mi
+  storageClass: ""
+
+istio:
+  host: mirrorapi.tp.lan
+  gateway: mirrorapi-gateway
+
+certmanager:
+  issuer: local-ca-issuer
+  secretName: mirrorapi-tls
