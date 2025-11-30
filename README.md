@@ -13,11 +13,11 @@ uv run main.py
 
 ## from scratch
 ```bash
-cd mirrorapi
 uv sync
 uv pip compile pyproject.toml -o requirements.txt
 uv pip install -r requirements.txt
 uv run main.py
+uv run waitress-serve main:app
 ```
 
 ## run behave tests
@@ -32,12 +32,12 @@ docker build -t mirrorapi .
 
 ## Docker run
 ```bash
-docker run --rm -p 4500:4500 mirrorapi
+docker run --rm --name mirrorapi -p 4500:4500 -v mirror-db:/data mirrorapi
 ```
 
 ## Docker run daemon
 ```bash
-docker run --name mirrorapi -d -p 4500:4500 --restart unless-stopped wlanboy/mirrorapi
+docker run --name mirrorapi -d -p 4500:4500 -v mirror-db:/data --restart unless-stopped wlanboy/mirrorapi
 ```
 
 ## Usage

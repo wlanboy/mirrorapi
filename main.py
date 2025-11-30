@@ -3,6 +3,7 @@ from flask_smorest import Api
 import logging
 import sys
 import signal
+import os
 from swagger import configure_swagger_ui
 from header_api import header_blp
 from query_api import query_blp
@@ -13,8 +14,13 @@ logging.basicConfig()
 logger = logging.getLogger('waitress')
 logger.setLevel(logging.DEBUG)
 
+DATABASE_DIR = "/data"
+DATABASE_URL = f"sqlite:///{os.path.join(DATABASE_DIR, 'mirror_data.db')}"
+if not os.path.exists(DATABASE_DIR):
+    os.makedirs(DATABASE_DIR)
+
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mirror_data.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config["API_TITLE"] = "Mirror Echo API"
 app.config["API_VERSION"] = "v1"
