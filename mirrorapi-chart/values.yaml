@@ -21,4 +21,5 @@ istio:
 
 certmanager:
   issuer: local-ca-issuer
+  kind: ClusterIssuer
   secretName: mirrorapi-tls
