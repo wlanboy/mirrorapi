@@ -21,6 +21,19 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
       volumes:
         - name: data
           persistentVolumeClaim:

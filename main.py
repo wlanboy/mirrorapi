@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_smorest import Api
 import logging
 import sys
@@ -58,6 +58,21 @@ def info_page():
     </body>
     </html>
     """
+
+@app.route("/health", methods=["GET"])
+def health():
+    """Liveness Probe: prüft nur ob Flask läuft"""
+    return jsonify(status="ok"), 200
+
+@app.route("/ready", methods=["GET"])
+def ready():
+    """Readiness Probe: prüft zusätzlich DB-Verbindung"""
+    try:
+        with db.engine.connect() as conn:
+            conn.execute("SELECT 1")
+        return jsonify(status="ready"), 200
+    except Exception as e:
+        return jsonify(status="not ready", error=str(e)), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host="0.0.0.0", port=4500)
