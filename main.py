@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from sqlalchemy import text
 from flask_smorest import Api
 import logging
 import sys
@@ -69,7 +70,7 @@ def ready():
     """Readiness Probe: prüft zusätzlich DB-Verbindung"""
     try:
         with db.engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1"))
         return jsonify(status="ready"), 200
     except Exception as e:
         return jsonify(status="not ready", error=str(e)), 500
