@@ -1,6 +1,6 @@
 replicaCount: 1
 deploymentName: mirrorapi
-
+namespace: mirror
 image:
   repository: wlanboy/mirrorapi
   tag: latest
