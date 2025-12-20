@@ -9,6 +9,8 @@ spec:
     name: {{ .Values.certmanager.issuer }}
     kind: {{ .Values.certmanager.kind }}
   dnsNames:
-    - {{ .Values.istio.host }}
+  {{- range .Values.hosts }}
+    - {{ . }}
+  {{- end }}
   privateKey:
     rotationPolicy: Always

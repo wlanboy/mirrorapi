@@ -6,6 +6,10 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
+hosts: 
+  - mirrorapi.tp.lan
+  - mirrorapi.gmk.lan
+
 service:
   port: 4500
 
@@ -15,7 +19,6 @@ persistence:
   storageClass: standard
 
 istio:
-  host: mirrorapi.tp.lan
   gateway: mirrorapi-gateway
   gatewayNamespace: "istio-ingress"
 
