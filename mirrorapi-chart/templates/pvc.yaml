@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: mirrorapi-pvc
+  name: {{ .Values.deploymentName }}-pvc
 spec:
   accessModes:
     - ReadWriteOnce

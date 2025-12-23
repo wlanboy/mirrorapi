@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mirrorapi
+  name: {{ .Values.deploymentName }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -37,4 +37,4 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: mirrorapi-pvc
+            claimName: {{ .Values.deploymentName }}-pvc
