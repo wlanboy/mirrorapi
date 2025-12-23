@@ -4,7 +4,7 @@ namespace: mirror
 image:
   repository: wlanboy/mirrorapi
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 hosts: 
   - mirrorapi.tp.lan
@@ -23,6 +23,7 @@ istio:
   gatewayNamespace: "istio-ingress"
 
 certmanager:
+  enabled: true
   issuer: local-ca-issuer
   kind: ClusterIssuer
   secretName: mirrorapi-tls
