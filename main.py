@@ -1,57 +1,65 @@
-from flask import Flask, request, jsonify
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.routing import APIRoute
+from contextlib import asynccontextmanager
 from sqlalchemy import text
-from flask_smorest import Api
 import logging
-import sys
 import signal
-import os
-from swagger import configure_swagger_ui
-from header_api import header_blp
-from query_api import query_blp
-from mirror_api import mirror_blp, db
-from echo_api import echo_blp
+import sys
+
+from header_api import header_router
+from query_api import query_router
+from echo_api import echo_router
+from mirror_api import mirror_router, init_db, engine
 
 logging.basicConfig()
-logger = logging.getLogger('waitress')
+logger = logging.getLogger('uvicorn')
 logger.setLevel(logging.DEBUG)
 
-DATABASE_DIR = "/data"
-DATABASE_URL = f"sqlite:///{os.path.join(DATABASE_DIR, 'mirror_data.db')}"
-if not os.path.exists(DATABASE_DIR):
-    os.makedirs(DATABASE_DIR)
 
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config["API_TITLE"] = "Mirror Echo API"
-app.config["API_VERSION"] = "v1"
-app.config["OPENAPI_VERSION"] = "3.0.2"
-app.config["OPENAPI_URL_PREFIX"] = "/swagger-ui"
-app.config["OPENAPI_SWAGGER_UI_URL"] = "https://cdn.jsdelivr.net/npm/swagger-ui-dist/"
+def generate_unique_id(route: APIRoute) -> str:
+    """Generate unique operation IDs including the HTTP method."""
+    return f"{route.name}_{list(route.methods)[0].lower()}"
 
-api = Api(app)
-api.register_blueprint(header_blp)
-api.register_blueprint(query_blp)
-api.register_blueprint(mirror_blp)
-api.register_blueprint(echo_blp)
 
-# --- 5. Swagger UI Configuration ---
-configure_swagger_ui(app)
-
-db.init_app(app)
-with app.app_context():
-    db.create_all()
-
-def handle_sigterm(signal, frame):
+def handle_sigterm(signum, frame):
     print("SIGTERM received. Shutting down gracefully...")
     print("Cleanup complete. Exiting.")
     sys.exit(0)
 
+
 signal.signal(signal.SIGTERM, handle_sigterm)
 
-@app.route('/')
-def info_page():
-    return f"""
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await init_db()
+    yield
+    # Shutdown
+    await engine.dispose()
+
+
+app = FastAPI(
+    title="Mirror Echo API",
+    version="v1",
+    docs_url="/swagger-ui",
+    redoc_url="/redoc",
+    lifespan=lifespan,
+    generate_unique_id_function=generate_unique_id
+)
+
+# Register routers
+app.include_router(header_router)
+app.include_router(query_router)
+app.include_router(echo_router)
+app.include_router(mirror_router)
+
+
+@app.get("/", response_class=HTMLResponse)
+async def info_page():
+    """Application information page."""
+    return """
     <html>
     <body style="background-color:#121212; color:#e0e0e0; font-family:sans-serif;">
     <h3 style="color:#bb86fc;">Application Information</h3>
@@ -60,21 +68,27 @@ def info_page():
     </html>
     """
 
-@app.route("/health", methods=["GET"])
-def health():
-    """Liveness Probe: prüft nur ob Flask läuft"""
-    return jsonify(status="ok"), 200
 
-@app.route("/ready", methods=["GET"])
-def ready():
-    """Readiness Probe: prüft zusätzlich DB-Verbindung"""
+@app.get("/health")
+async def health():
+    """Liveness Probe: checks if the application is running."""
+    return {"status": "ok"}
+
+
+@app.get("/ready")
+async def ready():
+    """Readiness Probe: checks application and database connectivity."""
     try:
-        with db.engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return jsonify(status="ready"), 200
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return {"status": "ready"}
     except Exception as e:
-        return jsonify(status="not ready", error=str(e)), 500
+        return JSONResponse(
+            content={"status": "not ready", "error": str(e)},
+            status_code=500
+        )
+
 
 if __name__ == '__main__':
-    app.run(debug=True, host="0.0.0.0", port=4500)
-    #serve(TransLogger(app, setup_console_handler=True), host='0.0.0.0', port=4500, threads=2, expose_tracebacks=False)
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=4500)

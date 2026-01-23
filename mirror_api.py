@@ -1,37 +1,66 @@
-from flask_sqlalchemy import SQLAlchemy
-from flask import request, jsonify, make_response
-from flask_smorest import Blueprint
-from swagger import MirrorSaveSchema, MirrorDeleteSchema
+from fastapi import APIRouter, Request, Depends
+from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import Column, Integer, String, Text, select
 import json
+import os
 
-mirror_blp = Blueprint(
-    "mirror", __name__, url_prefix="/mirror", description="Manages and serves mirrored request/response pairs."
-)
+from schemas import MirrorSaveRequest, MessageResponse, ErrorResponse
 
-db = SQLAlchemy()
+DATABASE_DIR = os.environ.get("DATABASE_DIR", "/data")
+DATABASE_URL = f"sqlite+aiosqlite:///{os.path.join(DATABASE_DIR, 'mirror_data.db')}"
 
-class MirrorPair(db.Model):
+engine = create_async_engine(DATABASE_URL, echo=False)
+async_session = async_sessionmaker(engine, expire_on_commit=False)
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class MirrorPair(Base):
     __tablename__ = 'mirror_pairs'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    request_hash = db.Column(db.String, unique=True, nullable=False)
-    request_data = db.Column(db.Text, nullable=False)
-    response_data = db.Column(db.Text, nullable=False)
-    response_status = db.Column(db.Integer, nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    request_hash = Column(String, unique=True, nullable=False)
+    request_data = Column(Text, nullable=False)
+    response_data = Column(Text, nullable=False)
+    response_status = Column(Integer, nullable=False)
 
-def hash_request(request_data):
+
+async def init_db():
+    """Initialize the database and create tables."""
+    if not os.path.exists(DATABASE_DIR):
+        os.makedirs(DATABASE_DIR)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+
+async def get_db():
+    """Dependency for getting database session."""
+    async with async_session() as session:
+        yield session
+
+
+def hash_request(request_data) -> str:
     """Generates a consistent hash from the request body."""
     if request_data is None:
         return "None"
     return json.dumps(request_data, sort_keys=True)
 
-@mirror_blp.route("/save", methods=["POST"])
-@mirror_blp.arguments(MirrorSaveSchema)
-@mirror_blp.response(201, description="Request/Response pair saved successfully.")
-@mirror_blp.response(409, description="A pair with this request already exists.")
-def mirror_save(data):
-    request_data = data["request"]["request_data"]
-    response_data = data["response"]["response_data"]
-    response_status = data["response"]["response_status"]
+
+mirror_router = APIRouter(prefix="/mirror", tags=["mirror"])
+
+
+@mirror_router.post("/save", status_code=201)
+async def mirror_save(
+    data: MirrorSaveRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Save a request/response pair for later retrieval."""
+    request_data = data.request.request_data
+    response_data = data.response.response_data
+    response_status = data.response.response_status
     request_hash = hash_request(request_data)
 
     try:
@@ -41,58 +70,89 @@ def mirror_save(data):
             response_data=json.dumps(response_data),
             response_status=response_status
         )
-        db.session.add(pair)
-        db.session.commit()
-        return {"message": "Request/Response pair saved."}, 201
+        db.add(pair)
+        await db.commit()
+        return {"message": "Request/Response pair saved."}
     except Exception as e:
-        db.session.rollback()
+        await db.rollback()
         if 'UNIQUE constraint' in str(e):
-            return {"error": "A pair with this request already exists."}, 409
-        return {"error": str(e)}, 500
+            return JSONResponse(
+                content={"error": "A pair with this request already exists."},
+                status_code=409
+            )
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500
+        )
 
-@mirror_blp.route("/delete", methods=["POST"])
-@mirror_blp.doc(requestBody={"content": {"application/json": {"schema": {}}}})
-@mirror_blp.response(200, description="Pair deleted successfully.")
-@mirror_blp.response(404, description="Pair not found.")
-def mirror_delete():
+
+@mirror_router.post("/delete")
+async def mirror_delete(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete a saved request/response pair."""
     try:
-        request_data = request.get_json(silent=True)
+        request_data = await request.json()
         if request_data is None:
-            return {"error": "Request body cannot be empty."}, 400
+            return JSONResponse(
+                content={"error": "Request body cannot be empty."},
+                status_code=400
+            )
     except Exception:
-        return {"error": "Invalid JSON in request body."}, 400
-    
-    # Manuelle Verarbeitung des Request-Bodys
+        return JSONResponse(
+            content={"error": "Invalid JSON in request body."},
+            status_code=400
+        )
+
     request_hash = hash_request(request_data)
 
-    pair = MirrorPair.query.filter_by(request_hash=request_hash).first()
-    if not pair:
-        return {"error": "No matching pair found to delete."}, 404
-    db.session.delete(pair)
-    db.session.commit()
-    return {"message": "Pair deleted successfully."}, 200
+    result = await db.execute(
+        select(MirrorPair).where(MirrorPair.request_hash == request_hash)
+    )
+    pair = result.scalar_one_or_none()
 
-@mirror_blp.route("/", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-@mirror_blp.doc(requestBody={"content": {"application/json": {"schema": {}}}})
-@mirror_blp.response(200, description="Matching response found.", schema={})
-@mirror_blp.response(404, description="No matching response found.")
-def mirror_lookup():
+    if not pair:
+        return JSONResponse(
+            content={"error": "No matching pair found to delete."},
+            status_code=404
+        )
+
+    await db.delete(pair)
+    await db.commit()
+    return {"message": "Pair deleted successfully."}
+
+
+@mirror_router.api_route("/", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def mirror_lookup(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Look up and return a saved response for a matching request."""
     try:
-        request_data = request.get_json(silent=True)
+        request_data = await request.json()
         if request_data is None:
-            request_data = request.get_data(as_text=True)
+            body_bytes = await request.body()
+            request_data = body_bytes.decode("utf-8") if body_bytes else ""
     except Exception:
-        request_data = request.get_data(as_text=True)
+        body_bytes = await request.body()
+        request_data = body_bytes.decode("utf-8") if body_bytes else ""
 
     if not request_data:
         request_data = ""
 
     request_hash = hash_request(request_data)
 
-    pair = MirrorPair.query.filter_by(request_hash=request_hash).first()
+    result = await db.execute(
+        select(MirrorPair).where(MirrorPair.request_hash == request_hash)
+    )
+    pair = result.scalar_one_or_none()
+
     if not pair:
-        return {"error": "No mirrored response found for this request."}, 404
+        return JSONResponse(
+            content={"error": "No mirrored response found for this request."},
+            status_code=404
+        )
+
     response_data = json.loads(pair.response_data)
-    response_status = pair.response_status
-    response = make_response(jsonify(response_data), response_status)
-    return response
+    return JSONResponse(content=response_data, status_code=pair.response_status)

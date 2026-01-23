@@ -1,46 +1,68 @@
-from flask import request
-from flask_smorest import Blueprint
-from swagger import RequestHeadersSchema, EchoResponseSchema, ErrorResponseSchema
-import time
+from fastapi import APIRouter, Request, Header, Response
+from typing import Optional
+import asyncio
+import json
 
-# Create a shared function for the core logic
-def process_request_logic(status_code=None, wait_time=None, error_message=None):
+from schemas import EchoResponse, ErrorResponse
+
+header_router = APIRouter(prefix="/request", tags=["request"])
+
+
+async def process_request_logic(
+    request: Request,
+    status_code: Optional[int] = None,
+    wait_time: Optional[int] = None,
+    error_message: Optional[str] = None
+) -> tuple[dict, int]:
     """
     Unified function to process the request based on parameters from headers or path.
     """
-    request_headers = {key: value for key, value in request.headers.items()}
-    
-    if wait_time is not None:
-        time.sleep(wait_time)
-        
+    request_headers = dict(request.headers)
+
+    if wait_time is not None and wait_time > 0:
+        await asyncio.sleep(wait_time)
+
     if error_message is not None:
         return {"error": error_message}, 500
-        
+
     try:
-        request_body = request.get_json(silent=True)
+        request_body = await request.json()
     except Exception:
-        request_body = request.get_data(as_text=True)
+        request_body = (await request.body()).decode("utf-8") or None
 
     response_data = {
         "received_headers": request_headers,
         "received_body": request_body
     }
-    
+
     return response_data, status_code if status_code is not None else 200
 
-# --- Header-based API Blueprint ---
-header_blp = Blueprint(
-    "request", __name__, url_prefix="/request", description="API controlled by headers."
-)
 
-@header_blp.route("/", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-@header_blp.arguments(RequestHeadersSchema, location="headers")
-@header_blp.response(200, EchoResponseSchema, description="Successful request echo.")
-@header_blp.response(500, ErrorResponseSchema, description="Internal Server Error triggered by header.")
-def handle_header_request(headers_args):
-    # Process request using the data validated and parsed by Marshmallow
-    return process_request_logic(
-        status_code=headers_args.get('statuscode'),
-        wait_time=headers_args.get('waittime'),
-        error_message=headers_args.get('errorcode')
+@header_router.api_route("/", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def handle_header_request(
+    request: Request,
+    response: Response,
+    request_statuscode: Optional[int] = Header(None, alias="request-statuscode"),
+    request_waittime: Optional[int] = Header(None, alias="request-waittime"),
+    request_errorcode: Optional[str] = Header(None, alias="request-errorcode"),
+):
+    """
+    API controlled by headers.
+
+    - **request-statuscode**: Sets the response status code
+    - **request-waittime**: Adds a delay in seconds
+    - **request-errorcode**: Triggers a 500 error with this message
+    """
+    status_code = request_statuscode
+    if request_errorcode:
+        status_code = 500
+
+    response_data, final_status = await process_request_logic(
+        request=request,
+        status_code=status_code,
+        wait_time=request_waittime,
+        error_message=request_errorcode
     )
+
+    response.status_code = final_status
+    return response_data

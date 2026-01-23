@@ -1,18 +1,30 @@
-from mirror_api import db, MirrorPair
-from main import app
-from mirror_api import db, MirrorPair
+import os
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import OperationalError
 
-db_url = 'sqlite:///mirror_data.db';
+DATABASE_DIR = os.environ.get("DATABASE_DIR", "/data")
+DATABASE_URL = f"sqlite:///{os.path.join(DATABASE_DIR, 'mirror_data.db')}"
+
+engine = create_engine(DATABASE_URL)
+Session = sessionmaker(bind=engine)
+
 
 def before_scenario(context, scenario):
-    with app.app_context():
-        app.config['SQLALCHEMY_DATABASE_URI'] = db_url
-        db.session.query(MirrorPair).delete()
-        db.session.commit()
+    try:
+        with Session() as session:
+            session.execute(text("DELETE FROM mirror_pairs"))
+            session.commit()
+    except OperationalError:
+        # Table might not exist yet, that's OK
+        pass
+
 
 def after_scenario(context, scenario):
-    with app.app_context():
-        app.config['SQLALCHEMY_DATABASE_URI'] = db_url
-        db.session.query(MirrorPair).delete()
-        db.session.commit()
-
+    try:
+        with Session() as session:
+            session.execute(text("DELETE FROM mirror_pairs"))
+            session.commit()
+    except OperationalError:
+        # Table might not exist, that's OK
+        pass
