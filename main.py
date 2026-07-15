@@ -19,7 +19,7 @@ logger.setLevel(logging.DEBUG)
 
 def generate_unique_id(route: APIRoute) -> str:
     """Generate unique operation IDs including the HTTP method."""
-    return f"{route.name}_{list(route.methods)[0].lower()}"
+    return f"{route.name}_{list(route.methods or [])[0].lower()}"
 
 
 def handle_sigterm(signum, frame):
