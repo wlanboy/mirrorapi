@@ -131,15 +131,9 @@ async def mirror_lookup(
     """Look up and return a saved response for a matching request."""
     try:
         request_data = await request.json()
-        if request_data is None:
-            body_bytes = await request.body()
-            request_data = body_bytes.decode("utf-8") if body_bytes else ""
     except Exception:
         body_bytes = await request.body()
         request_data = body_bytes.decode("utf-8") if body_bytes else ""
-
-    if not request_data:
-        request_data = ""
 
     request_hash = hash_request(request_data)
 
