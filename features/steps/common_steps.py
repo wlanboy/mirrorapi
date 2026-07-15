@@ -1,7 +1,5 @@
 # features/steps/common_steps.py
-import requests
-from behave import given, when, then
-import json
+from behave import given
 
 BASE_URL = "http://localhost:4501"
 

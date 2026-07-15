@@ -30,7 +30,7 @@ def run_test(scenario_name, url, method="GET", headers=None, data=None,
         print("\n--- Response Details ---")
         print(f"Status Code: {response.status_code}")
         print(f"Time Taken: {duration:.2f} seconds")
-        print(f"Headers:")
+        print("Headers:")
         for key, value in response.headers.items():
             print(f"  {key}: {value}")
         
