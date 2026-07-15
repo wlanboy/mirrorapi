@@ -50,9 +50,21 @@ async def handle_path_request(
         if i + 1 < len(parts):
             value = parts[i + 1]
             if key == 'statuscode':
-                path_params['status_code'] = int(value)
+                try:
+                    path_params['status_code'] = int(value)
+                except ValueError:
+                    return JSONResponse(
+                        content={"error": "Invalid value for statuscode, must be an integer."},
+                        status_code=400
+                    )
             elif key == 'waittime':
-                path_params['wait_time'] = int(value)
+                try:
+                    path_params['wait_time'] = int(value)
+                except ValueError:
+                    return JSONResponse(
+                        content={"error": "Invalid value for waittime, must be an integer."},
+                        status_code=400
+                    )
             elif key == 'errorcode':
                 path_params['error_message'] = value
                 path_params['status_code'] = 500
