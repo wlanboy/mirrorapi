@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import Column, Integer, String, Text, select
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import Text, select
 import json
 import os
 
-from schemas import MirrorSaveRequest, MessageResponse, ErrorResponse
+from schemas import MirrorSaveRequest
 
 DATABASE_DIR = os.environ.get("DATABASE_DIR", "/data")
 DATABASE_URL = f"sqlite+aiosqlite:///{os.path.join(DATABASE_DIR, 'mirror_data.db')}"
@@ -21,11 +21,11 @@ class Base(DeclarativeBase):
 
 class MirrorPair(Base):
     __tablename__ = 'mirror_pairs'
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    request_hash = Column(String, unique=True, nullable=False)
-    request_data = Column(Text, nullable=False)
-    response_data = Column(Text, nullable=False)
-    response_status = Column(Integer, nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    request_hash: Mapped[str] = mapped_column(unique=True, nullable=False)
+    request_data: Mapped[str] = mapped_column(Text, nullable=False)
+    response_data: Mapped[str] = mapped_column(Text, nullable=False)
+    response_status: Mapped[int] = mapped_column(nullable=False)
 
 
 async def init_db():

@@ -1,9 +1,7 @@
 from fastapi import APIRouter, Request, Header, Response
 from typing import Optional
 import asyncio
-import json
 
-from schemas import EchoResponse, ErrorResponse
 
 header_router = APIRouter(prefix="/request", tags=["request"])
 
