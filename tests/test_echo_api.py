@@ -81,6 +81,17 @@ def test_echo_echoes_back_custom_header(client):
     assert response.headers["x-custom"] == "foobar"
 
 
+def test_echo_does_not_override_response_content_type(client):
+    response = client.post(
+        "/echo/statuscode/200",
+        content=b"plain text body",
+        headers={"content-type": "text/plain"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/json"
+
+
 def test_echo_returns_plain_text_body(client):
     response = client.post(
         "/echo/statuscode/200",

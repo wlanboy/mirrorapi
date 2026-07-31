@@ -118,7 +118,7 @@ async def process_path_request_logic(
             content={"error": error_message},
             status_code=status_code,
             headers={k: v for k, v in request_headers.items()
-                     if k.lower() not in ['content-length', 'connection', 'host']}
+                     if k.lower() not in ['content-length', 'connection', 'host', 'content-type']}
         )
 
     # Get the request body
@@ -135,7 +135,7 @@ async def process_path_request_logic(
     }
 
     # Create response with copied headers
-    excluded_headers = ['content-length', 'connection', 'host']
+    excluded_headers = ['content-length', 'connection', 'host', 'content-type']
     response_headers = {k: v for k, v in request_headers.items()
                         if k.lower() not in excluded_headers}
 

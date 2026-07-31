@@ -1,5 +1,6 @@
 
 from fastapi import APIRouter, Query, Request, Response
+from fastapi.responses import JSONResponse
 
 from header_api import process_request_logic
 
@@ -10,8 +11,8 @@ query_router = APIRouter(prefix="/echo", tags=["echo"])
 async def handle_query_request(
     request: Request,
     response: Response,
-    statuscode: int | None = Query(None, description="Sets the response status code"),
-    waittime: int | None = Query(None, description="Adds a delay in seconds"),
+    statuscode: str | None = Query(None, description="Sets the response status code"),
+    waittime: str | None = Query(None, description="Adds a delay in seconds"),
     errorcode: str | None = Query(None, description="Triggers a 500 error with this message"),
 ):
     """
@@ -21,14 +22,33 @@ async def handle_query_request(
     - **waittime**: Adds a delay in seconds
     - **errorcode**: Triggers a 500 error with this message
     """
-    status_code = statuscode
+    status_code = None
+    if statuscode is not None:
+        try:
+            status_code = int(statuscode)
+        except ValueError:
+            return JSONResponse(
+                content={"error": "Invalid value for statuscode, must be an integer."},
+                status_code=400
+            )
+
+    wait_time = None
+    if waittime is not None:
+        try:
+            wait_time = int(waittime)
+        except ValueError:
+            return JSONResponse(
+                content={"error": "Invalid value for waittime, must be an integer."},
+                status_code=400
+            )
+
     if errorcode:
         status_code = 500
 
     response_data, final_status = await process_request_logic(
         request=request,
         status_code=status_code,
-        wait_time=waittime,
+        wait_time=wait_time,
         error_message=errorcode
     )
 

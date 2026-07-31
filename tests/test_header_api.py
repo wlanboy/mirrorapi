@@ -42,6 +42,24 @@ def test_errorcode_header_triggers_500(client):
     assert response.json() == {"error": "Invalid data provided"}
 
 
+def test_invalid_statuscode_header_returns_400(client):
+    response = client.get("/request/", headers={"request-statuscode": "abc"})
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": "Invalid value for request-statuscode, must be an integer."
+    }
+
+
+def test_invalid_waittime_header_returns_400(client):
+    response = client.get("/request/", headers={"request-waittime": "abc"})
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": "Invalid value for request-waittime, must be an integer."
+    }
+
+
 def test_plain_text_body_is_echoed(client):
     response = client.post(
         "/request/",

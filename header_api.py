@@ -2,6 +2,7 @@ import asyncio
 import json
 
 from fastapi import APIRouter, Header, Request, Response
+from fastapi.responses import JSONResponse
 
 header_router = APIRouter(prefix="/request", tags=["request"])
 
@@ -40,8 +41,8 @@ async def process_request_logic(
 async def handle_header_request(
     request: Request,
     response: Response,
-    request_statuscode: int | None = Header(None, alias="request-statuscode"),
-    request_waittime: int | None = Header(None, alias="request-waittime"),
+    request_statuscode: str | None = Header(None, alias="request-statuscode"),
+    request_waittime: str | None = Header(None, alias="request-waittime"),
     request_errorcode: str | None = Header(None, alias="request-errorcode"),
 ):
     """
@@ -51,14 +52,33 @@ async def handle_header_request(
     - **request-waittime**: Adds a delay in seconds
     - **request-errorcode**: Triggers a 500 error with this message
     """
-    status_code = request_statuscode
+    status_code = None
+    if request_statuscode is not None:
+        try:
+            status_code = int(request_statuscode)
+        except ValueError:
+            return JSONResponse(
+                content={"error": "Invalid value for request-statuscode, must be an integer."},
+                status_code=400
+            )
+
+    wait_time = None
+    if request_waittime is not None:
+        try:
+            wait_time = int(request_waittime)
+        except ValueError:
+            return JSONResponse(
+                content={"error": "Invalid value for request-waittime, must be an integer."},
+                status_code=400
+            )
+
     if request_errorcode:
         status_code = 500
 
     response_data, final_status = await process_request_logic(
         request=request,
         status_code=status_code,
-        wait_time=request_waittime,
+        wait_time=wait_time,
         error_message=request_errorcode
     )
 

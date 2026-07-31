@@ -31,3 +31,21 @@ def test_errorcode_query_param_triggers_500(client):
 
     assert response.status_code == 500
     assert response.json() == {"error": "kaputt"}
+
+
+def test_invalid_statuscode_query_param_returns_400(client):
+    response = client.get("/echo/", params={"statuscode": "abc"})
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": "Invalid value for statuscode, must be an integer."
+    }
+
+
+def test_invalid_waittime_query_param_returns_400(client):
+    response = client.get("/echo/", params={"waittime": "abc"})
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": "Invalid value for waittime, must be an integer."
+    }
