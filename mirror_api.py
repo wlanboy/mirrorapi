@@ -1,9 +1,11 @@
 import json
 import os
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import Text, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -43,6 +45,9 @@ async def get_db():
         yield session
 
 
+DbSession = Annotated[AsyncSession, Depends(get_db)]
+
+
 def hash_request(request_data) -> str:
     """Generates a consistent hash from the request body."""
     if request_data is None:
@@ -56,7 +61,7 @@ mirror_router = APIRouter(prefix="/mirror", tags=["mirror"])
 @mirror_router.post("/save", status_code=201)
 async def mirror_save(
     data: MirrorSaveRequest,
-    db: AsyncSession = Depends(get_db)
+    db: DbSession
 ):
     """Save a request/response pair for later retrieval."""
     request_data = data.request.request_data
@@ -74,7 +79,7 @@ async def mirror_save(
         db.add(pair)
         await db.commit()
         return {"message": "Request/Response pair saved."}
-    except Exception as e:
+    except SQLAlchemyError as e:
         await db.rollback()
         if 'UNIQUE constraint' in str(e):
             return JSONResponse(
@@ -90,7 +95,7 @@ async def mirror_save(
 @mirror_router.post("/delete")
 async def mirror_delete(
     request: Request,
-    db: AsyncSession = Depends(get_db)
+    db: DbSession
 ):
     """Delete a saved request/response pair."""
     try:
@@ -100,7 +105,7 @@ async def mirror_delete(
                 content={"error": "Request body cannot be empty."},
                 status_code=400
             )
-    except Exception:
+    except json.JSONDecodeError:
         return JSONResponse(
             content={"error": "Invalid JSON in request body."},
             status_code=400
@@ -127,12 +132,12 @@ async def mirror_delete(
 @mirror_router.api_route("/", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def mirror_lookup(
     request: Request,
-    db: AsyncSession = Depends(get_db)
+    db: DbSession
 ):
     """Look up and return a saved response for a matching request."""
     try:
         request_data = await request.json()
-    except Exception:
+    except json.JSONDecodeError:
         body_bytes = await request.body()
         request_data = body_bytes.decode("utf-8") if body_bytes else ""
 

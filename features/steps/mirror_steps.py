@@ -9,7 +9,7 @@ BASE_URL = "http://localhost:4500"
 def step_impl(context, method, path):
     try:
         body = json.loads(context.text)
-    except Exception:
+    except json.JSONDecodeError:
         body = context.text
 
     method = method.upper()

@@ -20,7 +20,7 @@ logger.setLevel(logging.DEBUG)
 
 def generate_unique_id(route: APIRoute) -> str:
     """Generate unique operation IDs including the HTTP method."""
-    return f"{route.name}_{list(route.methods or [])[0].lower()}"
+    return f"{route.name}_{next(iter(route.methods or [])).lower()}"
 
 
 def handle_sigterm(signum, frame):
@@ -83,7 +83,7 @@ async def ready():
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         return {"status": "ready"}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - readiness probe must report any DB failure, not just known ones
         return JSONResponse(
             content={"status": "not ready", "error": str(e)},
             status_code=500

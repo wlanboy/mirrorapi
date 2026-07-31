@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
@@ -123,7 +124,7 @@ async def process_path_request_logic(
     # Get the request body
     try:
         request_body = await request.json()
-    except Exception:
+    except json.JSONDecodeError:
         body_bytes = await request.body()
         request_body = body_bytes.decode("utf-8") if body_bytes else None
 
