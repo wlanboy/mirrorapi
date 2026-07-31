@@ -1,6 +1,6 @@
 # MirrorAPI
 
-Eine leichtgewichtige REST-API zum Testen von HTTP-Clients und Microservices. Die API spiegelt eingehende Requests zurück und ermöglicht die Simulation verschiedener HTTP-Szenarien.
+Eine leichtgewichtige REST-API zum Testen von HTTP-Clients und Microservices. MirrorAPI spiegelt eingehende Requests (Header, Query-Parameter, Body) zurück, simuliert HTTP-Szenarien wie beliebige Status-Codes, Verzögerungen und Fehler und kann Request/Response-Paare dauerhaft als Mocks speichern – ideal für Integrationstests, Contract-Tests und lokale Entwicklung ohne echte Backend-Abhängigkeiten.
 
 ## Was macht MirrorAPI?
 
