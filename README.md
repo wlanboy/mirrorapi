@@ -15,7 +15,7 @@ Sendet den eingehenden Request (Headers und Body) als Response zurück. Ideal zu
 - **Fehlermeldungen**: Löse kontrollierte Fehler aus
 
 ### Request/Response Mirroring
-Speichere Request/Response-Paare in einer SQLite-Datenbank. Bei späteren Requests mit identischem Body wird die gespeicherte Response zurückgegeben - perfekt für Mocking in Tests.
+Speichere Request/Response-Paare in einer SQLite-Datenbank. Bei späteren Requests mit identischem Body wird die gespeicherte Response zurückgegeben - perfekt für Mocking in Tests. Optional lassen sich Paare zusätzlich nach HTTP-Methode und/oder Query-Parametern disambiguieren, damit zwei "Endpunkte" mit demselben Body nicht kollidieren.
 
 ## Endpoints
 
@@ -174,12 +174,35 @@ Response:
 [
   {
     "id": 1,
+    "method": null,
+    "query_params": null,
     "request_data": {"user_id": 123},
     "response_data": {"name": "Max"},
     "response_status": 200
   }
 ]
 ```
+
+### Paare nach Methode/Query-Parametern disambiguieren
+Ohne `method`/`query_params` matcht ein gespeichertes Paar den Body unabhängig von HTTP-Methode und Query - das ist weiterhin der Standardfall. Um zwei "Endpunkte" mit identischem Body zu unterscheiden, gib beim Speichern die Methode und/oder Query-Parameter an, die beim Abruf tatsächlich verwendet werden:
+
+```bash
+curl -X POST http://localhost:4500/mirror/save \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request": {"request_data": {"user_id": 123}, "method": "GET"},
+    "response": {"response_data": {"name": "Max"}, "response_status": 200}
+  }'
+
+curl -X POST http://localhost:4500/mirror/save \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request": {"request_data": {"user_id": 123}, "method": "DELETE"},
+    "response": {"response_data": {"deleted": true}, "response_status": 200}
+  }'
+```
+
+`GET /mirror/` mit Body `{"user_id": 123}` liefert nun `{"name": "Max"}`, `DELETE /mirror/` mit demselben Body liefert `{"deleted": true}`. Ein Paar ohne `method` dient als Fallback, falls keine speziellere Methode/Query passt. `POST /mirror/delete` löscht dabei immer alle für den Body gespeicherten Varianten auf einmal.
 
 ## API-Dokumentation
 

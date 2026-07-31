@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import Text, select
+from sqlalchemy import Text, UniqueConstraint, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -22,10 +22,18 @@ class Base(DeclarativeBase):
     pass
 
 
+WILDCARD = "*"
+
+
 class MirrorPair(Base):
     __tablename__ = 'mirror_pairs'
+    __table_args__ = (
+        UniqueConstraint('request_hash', 'method_key', 'query_key', name='uq_mirror_pair_match'),
+    )
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    request_hash: Mapped[str] = mapped_column(unique=True, nullable=False)
+    request_hash: Mapped[str] = mapped_column(nullable=False)
+    method_key: Mapped[str] = mapped_column(nullable=False, default=WILDCARD)
+    query_key: Mapped[str] = mapped_column(nullable=False, default=WILDCARD)
     request_data: Mapped[str] = mapped_column(Text, nullable=False)
     response_data: Mapped[str] = mapped_column(Text, nullable=False)
     response_status: Mapped[int] = mapped_column(nullable=False)
@@ -55,6 +63,50 @@ def hash_request(request_data) -> str:
     return json.dumps(request_data, sort_keys=True)
 
 
+def method_key(method: str | None) -> str:
+    """Normalizes a method for matching, or WILDCARD if unspecified (matches any method)."""
+    return method.upper() if method else WILDCARD
+
+
+def query_key(query_params: dict[str, str] | None) -> str:
+    """Normalizes query parameters for matching, or WILDCARD if unspecified (matches any query)."""
+    if not query_params:
+        return WILDCARD
+    return json.dumps(dict(query_params), sort_keys=True)
+
+
+async def find_matching_pair(
+    db: AsyncSession,
+    request_data,
+    method: str,
+    query_params: dict[str, str]
+) -> MirrorPair | None:
+    """
+    Finds the saved pair matching the request body, method and query params.
+
+    A pair saved without a method/query constraint (WILDCARD) matches any
+    actual method/query. Among several matches, the most specific one wins.
+    """
+    actual_method_key = method_key(method)
+    actual_query_key = query_key(query_params)
+
+    result = await db.execute(
+        select(MirrorPair).where(
+            MirrorPair.request_hash == hash_request(request_data),
+            MirrorPair.method_key.in_([WILDCARD, actual_method_key]),
+            MirrorPair.query_key.in_([WILDCARD, actual_query_key]),
+        )
+    )
+    candidates = result.scalars().all()
+    if not candidates:
+        return None
+
+    def specificity(pair: MirrorPair) -> int:
+        return (pair.method_key != WILDCARD) + (pair.query_key != WILDCARD)
+
+    return max(candidates, key=specificity)
+
+
 mirror_router = APIRouter(prefix="/mirror", tags=["mirror"])
 
 
@@ -63,15 +115,23 @@ async def mirror_save(
     data: MirrorSaveRequest,
     db: DbSession
 ):
-    """Save a request/response pair for later retrieval."""
+    """
+    Save a request/response pair for later retrieval.
+
+    By default the pair matches a request with the same body regardless of
+    HTTP method or query parameters. Set `request.method` and/or
+    `request.query_params` to only match requests with those values, which
+    allows saving distinct pairs for the same body (e.g. one per method).
+    """
     request_data = data.request.request_data
     response_data = data.response.response_data
     response_status = data.response.response_status
-    request_hash = hash_request(request_data)
 
     try:
         pair = MirrorPair(
-            request_hash=request_hash,
+            request_hash=hash_request(request_data),
+            method_key=method_key(data.request.method),
+            query_key=query_key(data.request.query_params),
             request_data=json.dumps(request_data),
             response_data=json.dumps(response_data),
             response_status=response_status
@@ -83,7 +143,7 @@ async def mirror_save(
         await db.rollback()
         if 'UNIQUE constraint' in str(e):
             return JSONResponse(
-                content={"error": "A pair with this request already exists."},
+                content={"error": "A pair with this request, method and query already exists."},
                 status_code=409
             )
         return JSONResponse(
@@ -97,7 +157,12 @@ async def mirror_delete(
     request: Request,
     db: DbSession
 ):
-    """Delete a saved request/response pair."""
+    """
+    Delete all saved pairs for a request body.
+
+    Removes every pair saved for this body, regardless of the method/query
+    constraint it was saved with (there may be several, e.g. one per method).
+    """
     try:
         request_data = await request.json()
         if request_data is None:
@@ -111,20 +176,19 @@ async def mirror_delete(
             status_code=400
         )
 
-    request_hash = hash_request(request_data)
-
     result = await db.execute(
-        select(MirrorPair).where(MirrorPair.request_hash == request_hash)
+        select(MirrorPair).where(MirrorPair.request_hash == hash_request(request_data))
     )
-    pair = result.scalar_one_or_none()
+    pairs = result.scalars().all()
 
-    if not pair:
+    if not pairs:
         return JSONResponse(
             content={"error": "No matching pair found to delete."},
             status_code=404
         )
 
-    await db.delete(pair)
+    for pair in pairs:
+        await db.delete(pair)
     await db.commit()
     return {"message": "Pair deleted successfully."}
 
@@ -137,6 +201,8 @@ async def mirror_list(db: DbSession):
     return [
         {
             "id": pair.id,
+            "method": None if pair.method_key == WILDCARD else pair.method_key,
+            "query_params": None if pair.query_key == WILDCARD else json.loads(pair.query_key),
             "request_data": json.loads(pair.request_data),
             "response_data": json.loads(pair.response_data),
             "response_status": pair.response_status,
@@ -150,19 +216,20 @@ async def mirror_lookup(
     request: Request,
     db: DbSession
 ):
-    """Look up and return a saved response for a matching request."""
+    """
+    Look up and return a saved response for a matching request.
+
+    Matches on body, HTTP method and query parameters. A pair saved without
+    a method/query constraint matches any method/query for that body; among
+    several matches, the most specific one wins.
+    """
     try:
         request_data = await request.json()
     except json.JSONDecodeError:
         body_bytes = await request.body()
         request_data = body_bytes.decode("utf-8") if body_bytes else ""
 
-    request_hash = hash_request(request_data)
-
-    result = await db.execute(
-        select(MirrorPair).where(MirrorPair.request_hash == request_hash)
-    )
-    pair = result.scalar_one_or_none()
+    pair = await find_matching_pair(db, request_data, request.method, dict(request.query_params))
 
     if not pair:
         return JSONResponse(

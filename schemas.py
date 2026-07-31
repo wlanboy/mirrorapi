@@ -14,6 +14,8 @@ class ErrorResponse(BaseModel):
 
 class MirrorRequest(BaseModel):
     request_data: Any
+    method: str | None = None
+    query_params: dict[str, str] | None = None
 
 
 class MirrorResponse(BaseModel):
