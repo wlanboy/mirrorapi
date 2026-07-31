@@ -1,5 +1,6 @@
+from typing import Any
+
 from pydantic import BaseModel
-from typing import Any, Optional
 
 
 class EchoResponse(BaseModel):
@@ -31,4 +32,4 @@ class MessageResponse(BaseModel):
 
 class StatusResponse(BaseModel):
     status: str
-    error: Optional[str] = None
+    error: str | None = None

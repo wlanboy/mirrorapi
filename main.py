@@ -1,16 +1,17 @@
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.routing import APIRoute
-from contextlib import asynccontextmanager
-from sqlalchemy import text
 import logging
 import signal
 import sys
+from contextlib import asynccontextmanager
 
-from header_api import header_router
-from query_api import query_router
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.routing import APIRoute
+from sqlalchemy import text
+
 from echo_api import echo_router
-from mirror_api import mirror_router, init_db, engine
+from header_api import header_router
+from mirror_api import engine, init_db, mirror_router
+from query_api import query_router
 
 logging.basicConfig()
 logger = logging.getLogger('uvicorn')

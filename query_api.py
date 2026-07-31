@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Request, Query, Response
-from typing import Optional
+
+from fastapi import APIRouter, Query, Request, Response
 
 from header_api import process_request_logic
 
@@ -10,9 +10,9 @@ query_router = APIRouter(prefix="/echo", tags=["echo"])
 async def handle_query_request(
     request: Request,
     response: Response,
-    statuscode: Optional[int] = Query(None, description="Sets the response status code"),
-    waittime: Optional[int] = Query(None, description="Adds a delay in seconds"),
-    errorcode: Optional[str] = Query(None, description="Triggers a 500 error with this message"),
+    statuscode: int | None = Query(None, description="Sets the response status code"),
+    waittime: int | None = Query(None, description="Adds a delay in seconds"),
+    errorcode: str | None = Query(None, description="Triggers a 500 error with this message"),
 ):
     """
     API controlled by query parameters.

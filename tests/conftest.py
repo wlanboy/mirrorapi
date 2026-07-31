@@ -5,15 +5,15 @@ import tempfile
 # happen before any application module is imported.
 os.environ["DATABASE_DIR"] = tempfile.mkdtemp(prefix="mirrorapi-test-")
 
-import asyncio  # noqa: E402
+import asyncio
 
-import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import text  # noqa: E402
-from sqlalchemy.exc import OperationalError  # noqa: E402
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
-from main import app  # noqa: E402
-from mirror_api import engine  # noqa: E402
+from main import app
+from mirror_api import engine
 
 
 @pytest.fixture()

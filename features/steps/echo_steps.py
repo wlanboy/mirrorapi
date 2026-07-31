@@ -1,5 +1,5 @@
 import requests
-from behave import when, then
+from behave import then, when
 
 BASE_URL = "http://localhost:4500"
 

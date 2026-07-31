@@ -1,16 +1,15 @@
-from fastapi import APIRouter, Request, Header, Response
-from typing import Optional
 import asyncio
 
+from fastapi import APIRouter, Header, Request, Response
 
 header_router = APIRouter(prefix="/request", tags=["request"])
 
 
 async def process_request_logic(
     request: Request,
-    status_code: Optional[int] = None,
-    wait_time: Optional[int] = None,
-    error_message: Optional[str] = None
+    status_code: int | None = None,
+    wait_time: int | None = None,
+    error_message: str | None = None
 ) -> tuple[dict, int]:
     """
     Unified function to process the request based on parameters from headers or path.
@@ -40,9 +39,9 @@ async def process_request_logic(
 async def handle_header_request(
     request: Request,
     response: Response,
-    request_statuscode: Optional[int] = Header(None, alias="request-statuscode"),
-    request_waittime: Optional[int] = Header(None, alias="request-waittime"),
-    request_errorcode: Optional[str] = Header(None, alias="request-errorcode"),
+    request_statuscode: int | None = Header(None, alias="request-statuscode"),
+    request_waittime: int | None = Header(None, alias="request-waittime"),
+    request_errorcode: str | None = Header(None, alias="request-errorcode"),
 ):
     """
     API controlled by headers.

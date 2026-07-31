@@ -1,5 +1,6 @@
-import requests
 import json
+
+import requests
 from behave import when
 
 BASE_URL = "http://localhost:4500"

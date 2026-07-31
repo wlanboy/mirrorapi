@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Request, Header
-from fastapi.responses import JSONResponse
-from typing import Optional
 import asyncio
+
+from fastapi import APIRouter, Header, Request
+from fastapi.responses import JSONResponse
 
 echo_router = APIRouter(prefix="/echo", tags=["echo-path"])
 
@@ -10,9 +10,9 @@ echo_router = APIRouter(prefix="/echo", tags=["echo-path"])
 async def handle_path_request(
     request: Request,
     options: str,
-    request_statuscode: Optional[str] = Header(None, alias="request-statuscode"),
-    request_waittime: Optional[str] = Header(None, alias="request-waittime"),
-    request_errorcode: Optional[str] = Header(None, alias="request-errorcode"),
+    request_statuscode: str | None = Header(None, alias="request-statuscode"),
+    request_waittime: str | None = Header(None, alias="request-waittime"),
+    request_errorcode: str | None = Header(None, alias="request-errorcode"),
 ):
     """
     Echo endpoint with path-based parameters.
@@ -82,12 +82,12 @@ async def handle_path_request(
 
 async def process_path_request_logic(
     request: Request,
-    status_code: Optional[int] = None,
-    wait_time: Optional[int] = None,
-    error_message: Optional[str] = None,
-    header_statuscode: Optional[int] = None,
-    header_waittime: Optional[int] = None,
-    header_errorcode: Optional[str] = None
+    status_code: int | None = None,
+    wait_time: int | None = None,
+    error_message: str | None = None,
+    header_statuscode: int | None = None,
+    header_waittime: int | None = None,
+    header_errorcode: str | None = None
 ):
     """Process request with path parameters, falling back to headers."""
     request_headers = dict(request.headers)

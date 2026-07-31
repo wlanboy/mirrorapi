@@ -1,7 +1,8 @@
-import requests
 import json
-import time
 import sys
+import time
+
+import requests
 
 # Base URLs of the running Flask API
 API_URL_HEADERS = "http://127.0.0.1:4500/request"
