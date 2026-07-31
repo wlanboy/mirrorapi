@@ -86,6 +86,36 @@ def test_delete_returns_404_for_unknown_pair(client):
     assert response.json() == {"error": "No matching pair found to delete."}
 
 
+def test_list_returns_empty_list_when_nothing_saved(client):
+    response = client.get("/mirror/list")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_list_returns_saved_pairs(client):
+    client.post("/mirror/save", json=_save_payload("GET"))
+    client.post("/mirror/save", json=_save_payload("POST"))
+
+    response = client.get("/mirror/list")
+
+    assert response.status_code == 200
+    entries = response.json()
+    assert len(entries) == 2
+    assert {"request_data", "response_data", "response_status", "id"} <= entries[0].keys()
+    assert {e["request_data"]["test"] for e in entries} == {"GET", "POST"}
+
+
+def test_list_no_longer_includes_deleted_pair(client):
+    client.post("/mirror/save", json=_save_payload("DELETE"))
+    client.post("/mirror/delete", json={"test": "DELETE"})
+
+    response = client.get("/mirror/list")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_delete_returns_400_for_invalid_json_body(client):
     response = client.post(
         "/mirror/delete",

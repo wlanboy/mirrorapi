@@ -31,6 +31,7 @@ Speichere Request/Response-Paare in einer SQLite-Datenbank. Bei späteren Reques
 | `* /echo/{path}` | Echo via Pfad-Parameter |
 | `POST /mirror/save` | Request/Response-Paar speichern |
 | `POST /mirror/delete` | Gespeichertes Paar löschen |
+| `GET /mirror/list` | Alle gespeicherten Paare auflisten |
 | `* /mirror/` | Gespeicherte Response abrufen |
 
 `*` = GET, POST, PUT, DELETE, PATCH
@@ -161,6 +162,23 @@ curl -X POST http://localhost:4500/mirror/ \
 Response:
 ```json
 {"name": "Max"}
+```
+
+### Gespeicherte Paare auflisten
+```bash
+curl http://localhost:4500/mirror/list
+```
+
+Response:
+```json
+[
+  {
+    "id": 1,
+    "request_data": {"user_id": 123},
+    "response_data": {"name": "Max"},
+    "response_status": 200
+  }
+]
 ```
 
 ## API-Dokumentation

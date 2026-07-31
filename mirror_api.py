@@ -129,6 +129,22 @@ async def mirror_delete(
     return {"message": "Pair deleted successfully."}
 
 
+@mirror_router.get("/list")
+async def mirror_list(db: DbSession):
+    """List all saved request/response pairs."""
+    result = await db.execute(select(MirrorPair).order_by(MirrorPair.id))
+    pairs = result.scalars().all()
+    return [
+        {
+            "id": pair.id,
+            "request_data": json.loads(pair.request_data),
+            "response_data": json.loads(pair.response_data),
+            "response_status": pair.response_status,
+        }
+        for pair in pairs
+    ]
+
+
 @mirror_router.api_route("/", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def mirror_lookup(
     request: Request,
