@@ -15,7 +15,7 @@ Sendet den eingehenden Request (Headers und Body) als Response zurück. Ideal zu
 - **Fehlermeldungen**: Löse kontrollierte Fehler aus
 
 ### Request/Response Mirroring
-Speichere Request/Response-Paare in einer SQLite-Datenbank. Bei späteren Requests mit identischem Body wird die gespeicherte Response zurückgegeben - perfekt für Mocking in Tests. Optional lassen sich Paare zusätzlich nach HTTP-Methode und/oder Query-Parametern disambiguieren, damit zwei "Endpunkte" mit demselben Body nicht kollidieren.
+Speichere Request/Response-Paare in einer SQLite-Datenbank. Bei späteren Requests mit identischem Body wird die gespeicherte Response zurückgegeben - perfekt für Mocking in Tests. Optional lassen sich Paare zusätzlich nach HTTP-Methode und/oder Query-Parametern disambiguieren, damit zwei "Endpunkte" mit demselben Body nicht kollidieren. Jedes Paar hat eine TTL (Standard: 1 Woche) und wird danach von Lookups ignoriert; `POST /mirror/cleanup` löscht abgelaufene Paare endgültig aus der Datenbank.
 
 ## Endpoints
 
@@ -31,7 +31,8 @@ Speichere Request/Response-Paare in einer SQLite-Datenbank. Bei späteren Reques
 | `* /echo/{path}` | Echo via Pfad-Parameter |
 | `POST /mirror/save` | Request/Response-Paar speichern |
 | `POST /mirror/delete` | Gespeichertes Paar löschen |
-| `GET /mirror/list` | Alle gespeicherten Paare auflisten |
+| `GET /mirror/list` | Alle gespeicherten (nicht abgelaufenen) Paare auflisten |
+| `POST /mirror/cleanup` | Abgelaufene Paare löschen |
 | `* /mirror/` | Gespeicherte Response abrufen |
 
 `*` = GET, POST, PUT, DELETE, PATCH
@@ -178,7 +179,8 @@ Response:
     "query_params": null,
     "request_data": {"user_id": 123},
     "response_data": {"name": "Max"},
-    "response_status": 200
+    "response_status": 200,
+    "expires_at": "2026-08-07T12:00:00Z"
   }
 ]
 ```
@@ -203,6 +205,25 @@ curl -X POST http://localhost:4500/mirror/save \
 ```
 
 `GET /mirror/` mit Body `{"user_id": 123}` liefert nun `{"name": "Max"}`, `DELETE /mirror/` mit demselben Body liefert `{"deleted": true}`. Ein Paar ohne `method` dient als Fallback, falls keine speziellere Methode/Query passt. `POST /mirror/delete` löscht dabei immer alle für den Body gespeicherten Varianten auf einmal.
+
+### TTL und Cleanup
+Jedes gespeicherte Paar bekommt eine Ablaufzeit (`ttl_seconds`, Standard 604800 Sekunden = 1 Woche). Nach Ablauf wird es von `GET/POST/... /mirror/`-Lookups und `GET /mirror/list` ignoriert, bleibt aber bis zum nächsten Cleanup physisch in der SQLite-Datei.
+
+```bash
+curl -X POST http://localhost:4500/mirror/save \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request": {"request_data": {"user_id": 123}, "ttl_seconds": 3600},
+    "response": {"response_data": {"name": "Max"}, "response_status": 200}
+  }'
+
+curl -X POST http://localhost:4500/mirror/cleanup
+```
+
+Response von `/mirror/cleanup`:
+```json
+{"deleted": 3}
+```
 
 ## API-Dokumentation
 

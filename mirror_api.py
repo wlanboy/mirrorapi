@@ -1,15 +1,18 @@
 import json
 import os
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import Text, UniqueConstraint, select
+from sqlalchemy import Text, UniqueConstraint, delete, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from schemas import MirrorSaveRequest
+
+DEFAULT_TTL_SECONDS = 7 * 24 * 60 * 60  # 1 week
 
 DATABASE_DIR = os.environ.get("DATABASE_DIR", "/data")
 DATABASE_URL = f"sqlite+aiosqlite:///{os.path.join(DATABASE_DIR, 'mirror_data.db')}"
@@ -37,6 +40,12 @@ class MirrorPair(Base):
     request_data: Mapped[str] = mapped_column(Text, nullable=False)
     response_data: Mapped[str] = mapped_column(Text, nullable=False)
     response_status: Mapped[int] = mapped_column(nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(nullable=False, index=True)
+
+
+def utcnow() -> datetime:
+    """Naive UTC timestamp, kept tz-naive for consistent SQLite comparisons."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 async def init_db():
@@ -95,6 +104,7 @@ async def find_matching_pair(
             MirrorPair.request_hash == hash_request(request_data),
             MirrorPair.method_key.in_([WILDCARD, actual_method_key]),
             MirrorPair.query_key.in_([WILDCARD, actual_query_key]),
+            MirrorPair.expires_at > utcnow(),
         )
     )
     candidates = result.scalars().all()
@@ -122,10 +132,20 @@ async def mirror_save(
     HTTP method or query parameters. Set `request.method` and/or
     `request.query_params` to only match requests with those values, which
     allows saving distinct pairs for the same body (e.g. one per method).
+
+    Expires after `request.ttl_seconds` (default 1 week) and is then ignored
+    by lookups; use `POST /mirror/cleanup` to purge expired pairs.
     """
     request_data = data.request.request_data
     response_data = data.response.response_data
     response_status = data.response.response_status
+
+    ttl_seconds = data.request.ttl_seconds
+    if ttl_seconds is not None and ttl_seconds <= 0:
+        return JSONResponse(
+            content={"error": "ttl_seconds must be a positive integer."},
+            status_code=400
+        )
 
     try:
         pair = MirrorPair(
@@ -134,7 +154,8 @@ async def mirror_save(
             query_key=query_key(data.request.query_params),
             request_data=json.dumps(request_data),
             response_data=json.dumps(response_data),
-            response_status=response_status
+            response_status=response_status,
+            expires_at=utcnow() + timedelta(seconds=ttl_seconds or DEFAULT_TTL_SECONDS)
         )
         db.add(pair)
         await db.commit()
@@ -195,8 +216,12 @@ async def mirror_delete(
 
 @mirror_router.get("/list")
 async def mirror_list(db: DbSession):
-    """List all saved request/response pairs."""
-    result = await db.execute(select(MirrorPair).order_by(MirrorPair.id))
+    """List all saved, non-expired request/response pairs."""
+    result = await db.execute(
+        select(MirrorPair)
+        .where(MirrorPair.expires_at > utcnow())
+        .order_by(MirrorPair.id)
+    )
     pairs = result.scalars().all()
     return [
         {
@@ -206,9 +231,21 @@ async def mirror_list(db: DbSession):
             "request_data": json.loads(pair.request_data),
             "response_data": json.loads(pair.response_data),
             "response_status": pair.response_status,
+            "expires_at": pair.expires_at.isoformat() + "Z",
         }
         for pair in pairs
     ]
+
+
+@mirror_router.post("/cleanup")
+async def mirror_cleanup(db: DbSession):
+    """Delete all expired pairs and report how many were removed."""
+    result = await db.execute(select(MirrorPair.id).where(MirrorPair.expires_at <= utcnow()))
+    expired_ids = result.scalars().all()
+    if expired_ids:
+        await db.execute(delete(MirrorPair).where(MirrorPair.id.in_(expired_ids)))
+        await db.commit()
+    return {"deleted": len(expired_ids)}
 
 
 @mirror_router.api_route("/", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
