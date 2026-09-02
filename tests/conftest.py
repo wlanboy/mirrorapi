@@ -13,7 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
 from main import app
-from mirror_api import engine
+from mirror_db import engine
 
 
 @pytest.fixture()

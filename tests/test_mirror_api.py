@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
-import mirror_api
-from mirror_api import hash_request
+import mirror_service
+from mirror_service import hash_request
 
 
 def test_hash_request_returns_none_marker_for_none():
@@ -224,7 +224,7 @@ def test_save_default_ttl_is_about_one_week(client):
 
     entries = client.get("/mirror/list").json()
     expires_at = datetime.fromisoformat(entries[0]["expires_at"].removesuffix("Z"))
-    delta = expires_at - mirror_api.utcnow()
+    delta = expires_at - mirror_service.utcnow()
 
     assert timedelta(days=6, hours=23) < delta <= timedelta(days=7, minutes=1)
 
@@ -237,7 +237,7 @@ def test_save_with_custom_ttl_seconds(client):
 
     entries = client.get("/mirror/list").json()
     expires_at = datetime.fromisoformat(entries[0]["expires_at"].removesuffix("Z"))
-    delta = expires_at - mirror_api.utcnow()
+    delta = expires_at - mirror_service.utcnow()
 
     assert timedelta(minutes=55) < delta <= timedelta(hours=1, minutes=1)
 
@@ -253,9 +253,9 @@ def test_save_with_invalid_ttl_seconds_returns_400(client):
 
 
 def test_expired_pair_is_ignored_by_lookup_and_list(client, monkeypatch):
-    past = mirror_api.utcnow() - timedelta(days=10)
+    past = mirror_service.utcnow() - timedelta(days=10)
     with monkeypatch.context() as m:
-        m.setattr(mirror_api, "utcnow", lambda: past)
+        m.setattr(mirror_service, "utcnow", lambda: past)
         client.post("/mirror/save", json={
             "request": {"request_data": {"a": "expired"}, "ttl_seconds": 1},
             "response": {"response_data": {"msg": "old"}, "response_status": 200},
@@ -266,9 +266,9 @@ def test_expired_pair_is_ignored_by_lookup_and_list(client, monkeypatch):
 
 
 def test_cleanup_removes_expired_pairs_and_reports_count(client, monkeypatch):
-    past = mirror_api.utcnow() - timedelta(days=10)
+    past = mirror_service.utcnow() - timedelta(days=10)
     with monkeypatch.context() as m:
-        m.setattr(mirror_api, "utcnow", lambda: past)
+        m.setattr(mirror_service, "utcnow", lambda: past)
         client.post("/mirror/save", json={
             "request": {"request_data": {"a": "expired"}, "ttl_seconds": 1},
             "response": {"response_data": {"msg": "old"}, "response_status": 200},

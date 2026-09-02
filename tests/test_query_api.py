@@ -1,6 +1,5 @@
+import asyncio
 from unittest.mock import AsyncMock
-
-import header_api
 
 
 def test_default_behavior_echoes_body(client):
@@ -18,7 +17,7 @@ def test_statuscode_query_param_sets_response_status(client):
 
 def test_waittime_query_param_delays_response(client, monkeypatch):
     sleep_mock = AsyncMock()
-    monkeypatch.setattr(header_api.asyncio, "sleep", sleep_mock)
+    monkeypatch.setattr(asyncio, "sleep", sleep_mock)
 
     response = client.get("/echo/", params={"waittime": 2})
 

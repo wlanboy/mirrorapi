@@ -1,6 +1,5 @@
+import asyncio
 from unittest.mock import AsyncMock
-
-import echo_api
 
 
 def test_echo_returns_json_body(client):
@@ -38,7 +37,7 @@ def test_echo_returns_status_code_from_header_fallback(client):
 
 def test_echo_waits_before_responding(client, monkeypatch):
     sleep_mock = AsyncMock()
-    monkeypatch.setattr(echo_api.asyncio, "sleep", sleep_mock)
+    monkeypatch.setattr(asyncio, "sleep", sleep_mock)
 
     response = client.get("/echo/waittime/1")
 
@@ -48,7 +47,7 @@ def test_echo_waits_before_responding(client, monkeypatch):
 
 def test_echo_combined_path_params(client, monkeypatch):
     sleep_mock = AsyncMock()
-    monkeypatch.setattr(echo_api.asyncio, "sleep", sleep_mock)
+    monkeypatch.setattr(asyncio, "sleep", sleep_mock)
 
     response = client.get("/echo/statuscode/204/waittime/2")
 
