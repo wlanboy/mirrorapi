@@ -1,8 +1,8 @@
-
 from fastapi import APIRouter, Query, Request, Response
 from fastapi.responses import JSONResponse
 
-from header_api import process_request_logic
+from echo_core import build_echo_payload
+from request_control import InvalidControlValue, ResponseControl
 
 query_router = APIRouter(prefix="/echo", tags=["echo"])
 
@@ -22,35 +22,15 @@ async def handle_query_request(
     - **waittime**: Adds a delay in seconds
     - **errorcode**: Triggers a 500 error with this message
     """
-    status_code = None
-    if statuscode is not None:
-        try:
-            status_code = int(statuscode)
-        except ValueError:
-            return JSONResponse(
-                content={"error": "Invalid value for statuscode, must be an integer."},
-                status_code=400
-            )
+    try:
+        control = ResponseControl.parse(
+            status_field="statuscode", status_raw=statuscode,
+            wait_field="waittime", wait_raw=waittime,
+            error_message=errorcode,
+        )
+    except InvalidControlValue as e:
+        return JSONResponse(content={"error": str(e)}, status_code=400)
 
-    wait_time = None
-    if waittime is not None:
-        try:
-            wait_time = int(waittime)
-        except ValueError:
-            return JSONResponse(
-                content={"error": "Invalid value for waittime, must be an integer."},
-                status_code=400
-            )
-
-    if errorcode:
-        status_code = 500
-
-    response_data, final_status = await process_request_logic(
-        request=request,
-        status_code=status_code,
-        wait_time=wait_time,
-        error_message=errorcode
-    )
-
+    response_data, final_status = await build_echo_payload(request, dict(request.headers), control)
     response.status_code = final_status
     return response_data

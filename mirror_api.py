@@ -1,121 +1,13 @@
 import json
-import os
-from datetime import UTC, datetime, timedelta
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import Text, UniqueConstraint, delete, select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+import mirror_service
+from mirror_db import WILDCARD, DbSession, MirrorPair
 from schemas import MirrorSaveRequest
-
-DEFAULT_TTL_SECONDS = 7 * 24 * 60 * 60  # 1 week
-
-DATABASE_DIR = os.environ.get("DATABASE_DIR", "/data")
-DATABASE_URL = f"sqlite+aiosqlite:///{os.path.join(DATABASE_DIR, 'mirror_data.db')}"
-
-engine = create_async_engine(DATABASE_URL, echo=False)
-async_session = async_sessionmaker(engine, expire_on_commit=False)
-
-
-class Base(DeclarativeBase):
-    pass
-
-
-WILDCARD = "*"
-
-
-class MirrorPair(Base):
-    __tablename__ = 'mirror_pairs'
-    __table_args__ = (
-        UniqueConstraint('request_hash', 'method_key', 'query_key', name='uq_mirror_pair_match'),
-    )
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    request_hash: Mapped[str] = mapped_column(nullable=False)
-    method_key: Mapped[str] = mapped_column(nullable=False, default=WILDCARD)
-    query_key: Mapped[str] = mapped_column(nullable=False, default=WILDCARD)
-    request_data: Mapped[str] = mapped_column(Text, nullable=False)
-    response_data: Mapped[str] = mapped_column(Text, nullable=False)
-    response_status: Mapped[int] = mapped_column(nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(nullable=False, index=True)
-
-
-def utcnow() -> datetime:
-    """Naive UTC timestamp, kept tz-naive for consistent SQLite comparisons."""
-    return datetime.now(UTC).replace(tzinfo=None)
-
-
-async def init_db():
-    """Initialize the database and create tables."""
-    if not os.path.exists(DATABASE_DIR):
-        os.makedirs(DATABASE_DIR)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-
-async def get_db():
-    """Dependency for getting database session."""
-    async with async_session() as session:
-        yield session
-
-
-DbSession = Annotated[AsyncSession, Depends(get_db)]
-
-
-def hash_request(request_data) -> str:
-    """Generates a consistent hash from the request body."""
-    if request_data is None:
-        return "None"
-    return json.dumps(request_data, sort_keys=True)
-
-
-def method_key(method: str | None) -> str:
-    """Normalizes a method for matching, or WILDCARD if unspecified (matches any method)."""
-    return method.upper() if method else WILDCARD
-
-
-def query_key(query_params: dict[str, str] | None) -> str:
-    """Normalizes query parameters for matching, or WILDCARD if unspecified (matches any query)."""
-    if not query_params:
-        return WILDCARD
-    return json.dumps(dict(query_params), sort_keys=True)
-
-
-async def find_matching_pair(
-    db: AsyncSession,
-    request_data,
-    method: str,
-    query_params: dict[str, str]
-) -> MirrorPair | None:
-    """
-    Finds the saved pair matching the request body, method and query params.
-
-    A pair saved without a method/query constraint (WILDCARD) matches any
-    actual method/query. Among several matches, the most specific one wins.
-    """
-    actual_method_key = method_key(method)
-    actual_query_key = query_key(query_params)
-
-    result = await db.execute(
-        select(MirrorPair).where(
-            MirrorPair.request_hash == hash_request(request_data),
-            MirrorPair.method_key.in_([WILDCARD, actual_method_key]),
-            MirrorPair.query_key.in_([WILDCARD, actual_query_key]),
-            MirrorPair.expires_at > utcnow(),
-        )
-    )
-    candidates = result.scalars().all()
-    if not candidates:
-        return None
-
-    def specificity(pair: MirrorPair) -> int:
-        return (pair.method_key != WILDCARD) + (pair.query_key != WILDCARD)
-
-    return max(candidates, key=specificity)
-
 
 mirror_router = APIRouter(prefix="/mirror", tags=["mirror"])
 
@@ -149,13 +41,13 @@ async def mirror_save(
 
     try:
         pair = MirrorPair(
-            request_hash=hash_request(request_data),
-            method_key=method_key(data.request.method),
-            query_key=query_key(data.request.query_params),
+            request_hash=mirror_service.hash_request(request_data),
+            method_key=mirror_service.method_key(data.request.method),
+            query_key=mirror_service.query_key(data.request.query_params),
             request_data=json.dumps(request_data),
             response_data=json.dumps(response_data),
             response_status=response_status,
-            expires_at=utcnow() + timedelta(seconds=ttl_seconds or DEFAULT_TTL_SECONDS)
+            expires_at=mirror_service.expires_at(ttl_seconds)
         )
         db.add(pair)
         await db.commit()
@@ -198,7 +90,7 @@ async def mirror_delete(
         )
 
     result = await db.execute(
-        select(MirrorPair).where(MirrorPair.request_hash == hash_request(request_data))
+        select(MirrorPair).where(MirrorPair.request_hash == mirror_service.hash_request(request_data))
     )
     pairs = result.scalars().all()
 
@@ -219,7 +111,7 @@ async def mirror_list(db: DbSession):
     """List all saved, non-expired request/response pairs."""
     result = await db.execute(
         select(MirrorPair)
-        .where(MirrorPair.expires_at > utcnow())
+        .where(MirrorPair.expires_at > mirror_service.utcnow())
         .order_by(MirrorPair.id)
     )
     pairs = result.scalars().all()
@@ -240,7 +132,7 @@ async def mirror_list(db: DbSession):
 @mirror_router.post("/cleanup")
 async def mirror_cleanup(db: DbSession):
     """Delete all expired pairs and report how many were removed."""
-    result = await db.execute(select(MirrorPair.id).where(MirrorPair.expires_at <= utcnow()))
+    result = await db.execute(select(MirrorPair.id).where(MirrorPair.expires_at <= mirror_service.utcnow()))
     expired_ids = result.scalars().all()
     if expired_ids:
         await db.execute(delete(MirrorPair).where(MirrorPair.id.in_(expired_ids)))
@@ -266,7 +158,7 @@ async def mirror_lookup(
         body_bytes = await request.body()
         request_data = body_bytes.decode("utf-8") if body_bytes else ""
 
-    pair = await find_matching_pair(db, request_data, request.method, dict(request.query_params))
+    pair = await mirror_service.find_matching_pair(db, request_data, request.method, dict(request.query_params))
 
     if not pair:
         return JSONResponse(

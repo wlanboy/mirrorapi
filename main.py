@@ -10,7 +10,8 @@ from sqlalchemy import text
 
 from echo_api import echo_router
 from header_api import header_router
-from mirror_api import engine, init_db, mirror_router
+from mirror_api import mirror_router
+from mirror_db import engine, init_db
 from query_api import query_router
 
 logging.basicConfig()
