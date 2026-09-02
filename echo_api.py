@@ -1,8 +1,8 @@
-import asyncio
-import json
-
 from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
+
+from echo_core import build_echo_payload, forwardable_headers
+from request_control import InvalidControlValue, ResponseControl, parse_int
 
 echo_router = APIRouter(prefix="/echo", tags=["echo-path"])
 
@@ -22,125 +22,53 @@ async def handle_path_request(
 
     Falls back to `request-*` headers if not specified in path.
     """
-    # Parse and validate header values
-    header_statuscode = None
-    header_waittime = None
-
-    if request_statuscode is not None:
-        try:
-            header_statuscode = int(request_statuscode)
-        except (ValueError, TypeError):
-            return JSONResponse(
-                content={"error": "Invalid value for request-statuscode, must be an integer."},
-                status_code=400
-            )
-
-    if request_waittime is not None:
-        try:
-            header_waittime = int(request_waittime)
-        except (ValueError, TypeError):
-            return JSONResponse(
-                content={"error": "Invalid value for request-waittime, must be an integer."},
-                status_code=400
-            )
-
-    path_params = {}
-    parts = options.split('/')
-    for i in range(0, len(parts), 2):
-        key = parts[i].lower()
-        if i + 1 < len(parts):
-            value = parts[i + 1]
-            if key == 'statuscode':
-                try:
-                    path_params['status_code'] = int(value)
-                except ValueError:
-                    return JSONResponse(
-                        content={"error": "Invalid value for statuscode, must be an integer."},
-                        status_code=400
-                    )
-            elif key == 'waittime':
-                try:
-                    path_params['wait_time'] = int(value)
-                except ValueError:
-                    return JSONResponse(
-                        content={"error": "Invalid value for waittime, must be an integer."},
-                        status_code=400
-                    )
-            elif key == 'errorcode':
-                path_params['error_message'] = value
-                path_params['status_code'] = 500
-
-    return await process_path_request_logic(
-        request,
-        path_params.get('status_code'),
-        path_params.get('wait_time'),
-        path_params.get('error_message'),
-        header_statuscode,
-        header_waittime,
-        request_errorcode
-    )
-
-
-async def process_path_request_logic(
-    request: Request,
-    status_code: int | None = None,
-    wait_time: int | None = None,
-    error_message: str | None = None,
-    header_statuscode: int | None = None,
-    header_waittime: int | None = None,
-    header_errorcode: str | None = None
-):
-    """Process request with path parameters, falling back to headers."""
-    request_headers = dict(request.headers)
-
-    # Use header values as fallback if path params not provided
-    if status_code is None and header_statuscode is not None:
-        status_code = header_statuscode
-    if wait_time is None and header_waittime is not None:
-        wait_time = header_waittime
-    if error_message is None and header_errorcode is not None:
-        status_code = 500
-        error_message = header_errorcode
-
-    # Set defaults
-    if status_code is None:
-        status_code = 200
-    if wait_time is None:
-        wait_time = 0
-
-    # Wait for the specified time
-    if wait_time > 0:
-        await asyncio.sleep(wait_time)
-
-    # Return an error message if specified
-    if error_message:
-        return JSONResponse(
-            content={"error": error_message},
-            status_code=status_code,
-            headers={k: v for k, v in request_headers.items()
-                     if k.lower() not in ['content-length', 'connection', 'host', 'content-type']}
-        )
-
-    # Get the request body
     try:
-        request_body = await request.json()
-    except json.JSONDecodeError:
-        body_bytes = await request.body()
-        request_body = body_bytes.decode("utf-8") if body_bytes else None
+        control = _resolve_control(options, request_statuscode, request_waittime, request_errorcode)
+    except InvalidControlValue as e:
+        return JSONResponse(content={"error": str(e)}, status_code=400)
 
-    # Prepare the response
-    response_data = {
-        "received_headers": request_headers,
-        "received_body": request_body
-    }
-
-    # Create response with copied headers
-    excluded_headers = ['content-length', 'connection', 'host', 'content-type']
-    response_headers = {k: v for k, v in request_headers.items()
-                        if k.lower() not in excluded_headers}
-
+    request_headers = dict(request.headers)
+    response_data, final_status = await build_echo_payload(request, request_headers, control)
     return JSONResponse(
         content=response_data,
-        status_code=status_code,
-        headers=response_headers
+        status_code=final_status,
+        headers=forwardable_headers(request_headers),
     )
+
+
+def _resolve_control(
+    options: str,
+    header_status_raw: str | None,
+    header_wait_raw: str | None,
+    header_error: str | None,
+) -> ResponseControl:
+    """Resolves status/wait/error from the path, falling back to the
+    `request-*` headers when a path segment is absent."""
+    path_status, path_wait, path_error = _parse_path_options(options)
+    header_status = parse_int("request-statuscode", header_status_raw)
+    header_wait = parse_int("request-waittime", header_wait_raw)
+
+    status_code = path_status if path_status is not None else header_status
+    wait_time = path_wait if path_wait is not None else header_wait
+    error_message = path_error if path_error is not None else header_error
+
+    return ResponseControl(
+        status_code=500 if error_message else (status_code if status_code is not None else 200),
+        wait_time=wait_time or 0,
+        error_message=error_message,
+    )
+
+
+def _parse_path_options(options: str) -> tuple[int | None, int | None, str | None]:
+    """Parses `key/value/key/value` path segments into status/wait/error overrides."""
+    status_code = wait_time = error_message = None
+    parts = options.split('/')
+    for i in range(0, len(parts) - 1, 2):
+        key, value = parts[i].lower(), parts[i + 1]
+        if key == 'statuscode':
+            status_code = parse_int('statuscode', value)
+        elif key == 'waittime':
+            wait_time = parse_int('waittime', value)
+        elif key == 'errorcode':
+            error_message = value
+    return status_code, wait_time, error_message
