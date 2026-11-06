@@ -6,7 +6,7 @@ annotated-doc==0.0.5
     # via fastapi
 annotated-types==0.8.0
     # via pydantic
-anyio==4.15.1
+anyio==4.16.0
     # via
     #   starlette
     #   watchfiles
@@ -16,7 +16,7 @@ certifi==2026.10.23
     # via requests
 charset-normalizer==3.5.2
     # via requests
-click==8.5.0
+click==8.5.1
     # via uvicorn
 colorama==0.4.6
     # via behave
@@ -44,9 +44,9 @@ parse==1.22.4
     #   parse-type
 parse-type==0.6.6
     # via behave
-pydantic==2.14.2
+pydantic==2.14.3
     # via fastapi
-pydantic-core==2.50.2
+pydantic-core==2.50.4
     # via pydantic
 python-dotenv==1.2.4
     # via uvicorn
@@ -58,7 +58,7 @@ six==1.17.0
     # via
     #   behave
     #   parse-type
-sqlalchemy==2.1.6
+sqlalchemy==2.1.8
     # via mirrorapi
 starlette==1.10.0
     # via fastapi
@@ -71,7 +71,7 @@ typing-extensions==4.16.0
     #   pydantic-core
     #   sqlalchemy
     #   typing-inspection
-typing-inspection==0.4.4
+typing-inspection==0.4.5
     # via
     #   fastapi
     #   pydantic
