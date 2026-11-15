@@ -23,11 +23,9 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy application code
-COPY *.py /app/
+# Copy application code owned by the non-root user
+COPY --chown=appuser:appuser *.py /app/
 
-# Set ownership and switch to non-root user
-RUN chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 4500
