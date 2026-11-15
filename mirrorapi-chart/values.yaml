@@ -1,10 +1,38 @@
-replicaCount: 1
+# Keine replicaCount: Das Deployment läuft fest mit einer Replica, siehe templates/deployment.yaml.
 deploymentName: mirrorapi
 namespace: mirror
 image:
   repository: wlanboy/mirrorapi
-  tag: latest
-  pullPolicy: Always
+  # Leer = appVersion aus Chart.yaml
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# Startwerte, nicht gemessen. Nach "docker stats" unter Last anpassen.
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# UID/GID 1000 = appuser aus dem Dockerfile. fsGroup macht das PVC für ihn beschreibbar.
+podSecurityContext:
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+
+# Größe des emptyDir für /tmp
+tmpSizeLimit: 64Mi
 
 hosts: 
   - mirrorapi.tp.lan

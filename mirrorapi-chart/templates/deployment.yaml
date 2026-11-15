@@ -3,7 +3,14 @@ kind: Deployment
 metadata:
   name: {{ .Values.deploymentName }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  # Fest auf 1: Die SQLite-Datei liegt auf einem ReadWriteOnce-PVC. Mehrere Pods
+  # würden gleichzeitig in dieselbe Datei schreiben oder hängen beim Mounten fest.
+  replicas: 1
+  revisionHistoryLimit: 2
+  # Recreate beendet den alten Pod, bevor der neue startet. Bei RollingUpdate
+  # liefen beide kurz parallel auf demselben Volume.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: {{ .Values.deploymentName }}
@@ -12,15 +19,24 @@ spec:
       labels:
         app: {{ .Values.deploymentName }}
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Values.deploymentName }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
           ports:
             - containerPort: {{ .Values.service.port }}
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: tmp
+              mountPath: /tmp
           livenessProbe:
             httpGet:
               path: /health
@@ -38,3 +54,7 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: {{ .Values.deploymentName }}-pvc
+        # Das Root-Dateisystem ist read-only, Python und SQLite brauchen ein beschreibbares /tmp.
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.tmpSizeLimit }}
