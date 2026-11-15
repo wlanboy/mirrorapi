@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Query, Request, Response
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 
 from echo_core import build_echo_payload
+from http_status import build_response
 from request_control import InvalidControlValue, ResponseControl
 
 query_router = APIRouter(prefix="/echo", tags=["echo"])
@@ -10,7 +11,6 @@ query_router = APIRouter(prefix="/echo", tags=["echo"])
 @query_router.api_route("/", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def handle_query_request(
     request: Request,
-    response: Response,
     statuscode: str | None = Query(None, description="Sets the response status code"),
     waittime: str | None = Query(None, description="Adds a delay in seconds"),
     errorcode: str | None = Query(None, description="Triggers a 500 error with this message"),
@@ -32,5 +32,4 @@ async def handle_query_request(
         return JSONResponse(content={"error": str(e)}, status_code=400)
 
     response_data, final_status = await build_echo_payload(request, dict(request.headers), control)
-    response.status_code = final_status
-    return response_data
+    return build_response(response_data, final_status)

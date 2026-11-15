@@ -1,6 +1,5 @@
 import logging
-import signal
-import sys
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -14,23 +13,14 @@ from mirror_api import mirror_router
 from mirror_db import engine, init_db
 from query_api import query_router
 
-logging.basicConfig()
-logger = logging.getLogger('uvicorn')
-logger.setLevel(logging.DEBUG)
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(level=LOG_LEVEL)
+logging.getLogger("uvicorn").setLevel(LOG_LEVEL)
 
 
 def generate_unique_id(route: APIRoute) -> str:
     """Generate unique operation IDs including the HTTP method."""
     return f"{route.name}_{next(iter(route.methods or [])).lower()}"
-
-
-def handle_sigterm(signum, frame):
-    print("SIGTERM received. Shutting down gracefully...")
-    print("Cleanup complete. Exiting.")
-    sys.exit(0)
-
-
-signal.signal(signal.SIGTERM, handle_sigterm)
 
 
 @asynccontextmanager

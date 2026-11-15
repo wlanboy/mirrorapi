@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Header, Request, Response
+from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 
 from echo_core import build_echo_payload
+from http_status import build_response
 from request_control import InvalidControlValue, ResponseControl
 
 header_router = APIRouter(prefix="/request", tags=["request"])
@@ -10,7 +11,6 @@ header_router = APIRouter(prefix="/request", tags=["request"])
 @header_router.api_route("/", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def handle_header_request(
     request: Request,
-    response: Response,
     request_statuscode: str | None = Header(None, alias="request-statuscode"),
     request_waittime: str | None = Header(None, alias="request-waittime"),
     request_errorcode: str | None = Header(None, alias="request-errorcode"),
@@ -32,5 +32,4 @@ async def handle_header_request(
         return JSONResponse(content={"error": str(e)}, status_code=400)
 
     response_data, final_status = await build_echo_payload(request, dict(request.headers), control)
-    response.status_code = final_status
-    return response_data
+    return build_response(response_data, final_status)

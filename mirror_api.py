@@ -6,6 +6,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import SQLAlchemyError
 
 import mirror_service
+from http_status import build_response
 from mirror_db import WILDCARD, DbSession, MirrorPair
 from schemas import MirrorSaveRequest
 
@@ -167,4 +168,4 @@ async def mirror_lookup(
         )
 
     response_data = json.loads(pair.response_data)
-    return JSONResponse(content=response_data, status_code=pair.response_status)
+    return build_response(response_data, pair.response_status)

@@ -48,3 +48,23 @@ def test_invalid_waittime_query_param_returns_400(client):
     assert response.json() == {
         "error": "Invalid value for waittime, must be an integer."
     }
+
+
+def test_statuscode_query_param_204_sends_empty_body(client):
+    response = client.get("/echo/", params={"statuscode": 204})
+
+    assert response.content == b""
+
+
+def test_statuscode_query_param_out_of_range_returns_400(client):
+    response = client.get("/echo/", params={"statuscode": 1000})
+
+    assert response.status_code == 400
+    assert response.json() == {"error": "Invalid value for statuscode, must be between 200 and 599."}
+
+
+def test_waittime_query_param_above_maximum_returns_400(client):
+    response = client.get("/echo/", params={"waittime": 86400})
+
+    assert response.status_code == 400
+    assert response.json() == {"error": "Invalid value for waittime, must be between 0 and 300."}

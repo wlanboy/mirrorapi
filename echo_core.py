@@ -8,7 +8,22 @@ from fastapi import Request
 
 from request_control import ResponseControl
 
-EXCLUDED_RESPONSE_HEADERS = {'content-length', 'connection', 'host', 'content-type'}
+# Request headers never copied onto the response: framing and encoding
+# headers would describe a body the response doesn't have, hop-by-hop
+# headers (RFC 9110, section 7.6.1) only apply to the incoming connection.
+EXCLUDED_RESPONSE_HEADERS = {
+    'connection',
+    'content-encoding',
+    'content-length',
+    'content-type',
+    'host',
+    'keep-alive',
+    'te',
+    'trailer',
+    'transfer-encoding',
+    'upgrade',
+}
+EXCLUDED_RESPONSE_HEADER_PREFIXES = ('proxy-',)
 
 
 async def build_echo_payload(
@@ -39,4 +54,8 @@ async def _read_body(request: Request):
 
 def forwardable_headers(headers: dict[str, str]) -> dict[str, str]:
     """Request headers safe to copy onto the response (path-echo endpoint only)."""
-    return {k: v for k, v in headers.items() if k.lower() not in EXCLUDED_RESPONSE_HEADERS}
+    return {k: v for k, v in headers.items() if _is_forwardable(k.lower())}
+
+
+def _is_forwardable(name: str) -> bool:
+    return name not in EXCLUDED_RESPONSE_HEADERS and not name.startswith(EXCLUDED_RESPONSE_HEADER_PREFIXES)

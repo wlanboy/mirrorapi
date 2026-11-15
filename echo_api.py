@@ -2,7 +2,14 @@ from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 
 from echo_core import build_echo_payload, forwardable_headers
-from request_control import InvalidControlValue, ResponseControl, parse_int
+from http_status import build_response
+from request_control import (
+    InvalidControlValue,
+    ResponseControl,
+    check_status_code,
+    check_wait_time,
+    parse_int,
+)
 
 echo_router = APIRouter(prefix="/echo", tags=["echo-path"])
 
@@ -29,11 +36,7 @@ async def handle_path_request(
 
     request_headers = dict(request.headers)
     response_data, final_status = await build_echo_payload(request, request_headers, control)
-    return JSONResponse(
-        content=response_data,
-        status_code=final_status,
-        headers=forwardable_headers(request_headers),
-    )
+    return build_response(response_data, final_status, forwardable_headers(request_headers))
 
 
 def _resolve_control(
@@ -45,17 +48,13 @@ def _resolve_control(
     """Resolves status/wait/error from the path, falling back to the
     `request-*` headers when a path segment is absent."""
     path_status, path_wait, path_error = _parse_path_options(options)
-    header_status = parse_int("request-statuscode", header_status_raw)
-    header_wait = parse_int("request-waittime", header_wait_raw)
+    header_status = check_status_code("request-statuscode", parse_int("request-statuscode", header_status_raw))
+    header_wait = check_wait_time("request-waittime", parse_int("request-waittime", header_wait_raw))
 
-    status_code = path_status if path_status is not None else header_status
-    wait_time = path_wait if path_wait is not None else header_wait
-    error_message = path_error if path_error is not None else header_error
-
-    return ResponseControl(
-        status_code=500 if error_message else (status_code if status_code is not None else 200),
-        wait_time=wait_time or 0,
-        error_message=error_message,
+    return ResponseControl.resolve(
+        path_status if path_status is not None else header_status,
+        path_wait if path_wait is not None else header_wait,
+        path_error if path_error is not None else header_error,
     )
 
 
@@ -66,9 +65,9 @@ def _parse_path_options(options: str) -> tuple[int | None, int | None, str | Non
     for i in range(0, len(parts) - 1, 2):
         key, value = parts[i].lower(), parts[i + 1]
         if key == 'statuscode':
-            status_code = parse_int('statuscode', value)
+            status_code = check_status_code('statuscode', parse_int('statuscode', value))
         elif key == 'waittime':
-            wait_time = parse_int('waittime', value)
+            wait_time = check_wait_time('waittime', parse_int('waittime', value))
         elif key == 'errorcode':
             error_message = value
     return status_code, wait_time, error_message

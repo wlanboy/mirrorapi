@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 
+import pytest
+
 import mirror_service
 from mirror_service import hash_request
 
@@ -295,3 +297,28 @@ def test_delete_returns_400_for_invalid_json_body(client):
 
     assert response.status_code == 400
     assert response.json() == {"error": "Invalid JSON in request body."}
+
+
+@pytest.mark.parametrize("status", [99, 1000, -5, 103])
+def test_save_with_out_of_range_response_status_returns_422(client, status):
+    payload = {
+        "request": {"request_data": {"status": status}},
+        "response": {"response_data": {"msg": "x"}, "response_status": status},
+    }
+
+    response = client.post("/mirror/save", json=payload)
+
+    assert response.status_code == 422
+
+
+def test_lookup_with_204_response_status_sends_empty_body(client):
+    payload = {
+        "request": {"request_data": {"leer": True}},
+        "response": {"response_data": {"ignoriert": True}, "response_status": 204},
+    }
+    assert client.post("/mirror/save", json=payload).status_code == 201
+
+    response = client.post("/mirror/", json={"leer": True})
+
+    assert response.status_code == 204
+    assert response.content == b""

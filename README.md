@@ -9,9 +9,11 @@ MirrorAPI ist ein Entwicklungswerkzeug mit folgenden Funktionen:
 ### Echo-Endpoints
 Sendet den eingehenden Request (Headers und Body) als Response zurück. Ideal zum Debuggen von HTTP-Clients.
 
+`/echo/{path}` kopiert die Request-Header zusätzlich in die Response. Ausgenommen sind Header, die Body oder Verbindung beschreiben: `content-type`, `content-length`, `content-encoding`, `transfer-encoding`, `host`, die hop-by-hop-Header (`connection`, `keep-alive`, `te`, `trailer`, `upgrade`) und alle `proxy-*`-Header.
+
 ### Konfigurierbare Responses
-- **Status Codes**: Simuliere beliebige HTTP-Status-Codes (200, 404, 500, etc.)
-- **Verzögerungen**: Füge künstliche Latenz hinzu um Timeouts zu testen
+- **Status Codes**: Simuliere HTTP-Status-Codes von 200 bis 599. Andere Werte liefern `400`. Bei 204 und 304 bleibt der Body leer. 1xx ist ausgeschlossen, weil ein informativer Status keine Endantwort sein kann.
+- **Verzögerungen**: Füge künstliche Latenz hinzu, um Timeouts zu testen. Erlaubt sind 0 bis `MAX_WAIT_SECONDS` Sekunden (Default 300), größere Werte liefern `400`.
 - **Fehlermeldungen**: Löse kontrollierte Fehler aus
 
 ### Request/Response Mirroring
@@ -75,6 +77,13 @@ uv pip compile pyproject.toml -o requirements.txt
 ```
 
 ## Ausführen
+
+### Umgebungsvariablen
+
+| Variable | Default | Bedeutung |
+|----------|---------|-----------|
+| `DATABASE_DIR` | `/data` | Verzeichnis der SQLite-Datenbank |
+| `MAX_WAIT_SECONDS` | `300` | Obergrenze für `waittime` bzw. `request-waittime` |
 
 ### Entwicklungsmodus (mit Auto-Reload)
 ```bash

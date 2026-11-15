@@ -68,3 +68,17 @@ def test_plain_text_body_is_echoed(client):
 
     assert response.status_code == 200
     assert response.json()["received_body"] == "plain text body"
+
+
+def test_statuscode_header_out_of_range_returns_400(client):
+    response = client.get("/request/", headers={"request-statuscode": "-5"})
+
+    assert response.status_code == 400
+    assert response.json() == {"error": "Invalid value for request-statuscode, must be between 200 and 599."}
+
+
+def test_waittime_header_above_maximum_returns_400(client):
+    response = client.get("/request/", headers={"request-waittime": "86400"})
+
+    assert response.status_code == 400
+    assert response.json() == {"error": "Invalid value for request-waittime, must be between 0 and 300."}

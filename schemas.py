@@ -1,6 +1,8 @@
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from http_status import MAX_STATUS_CODE, MIN_STATUS_CODE
 
 
 class EchoResponse(BaseModel):
@@ -21,7 +23,7 @@ class MirrorRequest(BaseModel):
 
 class MirrorResponse(BaseModel):
     response_data: Any
-    response_status: int
+    response_status: int = Field(ge=MIN_STATUS_CODE, le=MAX_STATUS_CODE)
 
 
 class MirrorSaveRequest(BaseModel):
