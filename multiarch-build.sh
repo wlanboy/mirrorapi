@@ -2,12 +2,31 @@
 
 # --- Konfiguration ---
 DOCKER_USERNAME="wlanboy"
-IMAGE_NAME="wlanboy/mirrorapi:latest"
+IMAGE_REPO="wlanboy/mirrorapi"
 PLATFORMS="linux/amd64,linux/arm64"
 BUILDER_NAME="multiarch-builder"
 
 # Fehlerbehandlung
 set -e
+
+# Version aus pyproject.toml (Tag, den das Helm-Chart über appVersion zieht)
+VERSION=$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)
+if [ -z "$VERSION" ]; then
+    echo "❌ Keine Version in pyproject.toml gefunden. Abbruch."
+    exit 1
+fi
+IMAGE_NAME="$IMAGE_REPO:$VERSION"
+
+# Commit für das OCI-Label org.opencontainers.image.revision
+REVISION=$(git rev-parse HEAD)
+if [ -n "$(git status --porcelain)" ]; then
+    REVISION="$REVISION-dirty"
+    echo "⚠️  Arbeitsverzeichnis hat uncommittete Änderungen, revision: $REVISION"
+fi
+
+TAG_ARGS=(-t "$IMAGE_NAME" -t "$IMAGE_REPO:latest")
+BUILD_ARGS=(--build-arg "REVISION=$REVISION")
+echo "Image: $IMAGE_NAME (+ latest), revision: $REVISION"
 
 # --- 1. Vorab-Abfragen & Cleanup ---
 echo "--- Vorbereitung ---"
@@ -64,7 +83,7 @@ read -p "Auswahl [1 oder 2]: " ACTION_CHOICE
 case $ACTION_CHOICE in
     1)
         echo "-> Starte lokalen Build..."
-        docker buildx build -t "$IMAGE_NAME" --load .
+        docker buildx build "${TAG_ARGS[@]}" "${BUILD_ARGS[@]}" --load .
         echo -e "\n--- Image-Informationen ---"
         docker buildx imagetools inspect "$IMAGE_NAME"
         echo "Größe auf dem Host:"
@@ -72,7 +91,7 @@ case $ACTION_CHOICE in
         ;;
     2)
         echo "-> Starte Multi-Arch Build & Push ($PLATFORMS)..."
-        docker buildx build --platform "$PLATFORMS" -t "$IMAGE_NAME" --push .
+        docker buildx build --platform "$PLATFORMS" "${TAG_ARGS[@]}" "${BUILD_ARGS[@]}" --push .
         echo -e "\n--- Remote Manifest-Informationen ---"
         docker buildx imagetools inspect "$IMAGE_NAME"
         ;;
