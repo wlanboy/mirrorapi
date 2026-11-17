@@ -16,6 +16,7 @@ from query_api import query_router
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(level=LOG_LEVEL)
 logging.getLogger("uvicorn").setLevel(LOG_LEVEL)
+logger = logging.getLogger(__name__)
 
 
 def generate_unique_id(route: APIRoute) -> str:
@@ -74,11 +75,10 @@ async def ready():
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         return {"status": "ready"}
-    except Exception as e:  # noqa: BLE001 - readiness probe must report any DB failure, not just known ones
-        return JSONResponse(
-            content={"status": "not ready", "error": str(e)},
-            status_code=500
-        )
+    except Exception:  # readiness probe must report any DB failure, not just known ones
+        # Details only to the log; the response must not expose paths or driver errors.
+        logger.exception("Readiness check failed")
+        return JSONResponse(content={"status": "not ready"}, status_code=500)
 
 
 if __name__ == '__main__':

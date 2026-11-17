@@ -1,7 +1,7 @@
 [project]
 name = "mirrorapi"
 version = "0.1.0"
-description = "Add your description here"
+description = "REST-API zum Testen von HTTP-Clients: spiegelt Requests, simuliert Status-Codes und Verzögerungen, speichert Mocks"
 readme = "README.md"
 requires-python = ">=3.15"
 dependencies = [
