@@ -30,7 +30,7 @@ echo "Image: $IMAGE_NAME (+ latest), revision: $REVISION"
 
 # --- 1. Vorab-Abfragen & Cleanup ---
 echo "--- Vorbereitung ---"
-read -p "Möchtest du den Docker Build-Cache vorab bereinigen? (y/N): " PRE_CLEANUP
+read -rp "Möchtest du den Docker Build-Cache vorab bereinigen? (y/N): " PRE_CLEANUP
 if [[ "$PRE_CLEANUP" =~ ^[Yy]$ ]]; then
     echo "-> Bereinige Build-Cache..."
     docker builder prune -a -f
@@ -54,7 +54,7 @@ else
 fi
 
 if [ "$LOGIN_REQUIRED" = true ]; then
-    read -sp "Docker Hub Passwort für $DOCKER_USERNAME eingeben: " DOCKER_PASSWORD
+    read -rsp "Docker Hub Passwort für $DOCKER_USERNAME eingeben: " DOCKER_PASSWORD
     echo ""
     echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 fi
@@ -78,14 +78,16 @@ docker buildx inspect --bootstrap
 echo -e "\nWas möchtest du tun?"
 echo "1) Nur bauen (lokal laden - nur aktuelle Architektur)"
 echo "2) Bauen und pushen (Multi-Arch zu Docker Hub)"
-read -p "Auswahl [1 oder 2]: " ACTION_CHOICE
+read -rp "Auswahl [1 oder 2]: " ACTION_CHOICE
 
 case $ACTION_CHOICE in
     1)
         echo "-> Starte lokalen Build..."
         docker buildx build "${TAG_ARGS[@]}" "${BUILD_ARGS[@]}" --load .
+        # imagetools inspect would query the registry, not the image loaded locally
         echo -e "\n--- Image-Informationen ---"
-        docker buildx imagetools inspect "$IMAGE_NAME"
+        docker image inspect "$IMAGE_NAME" \
+            --format 'Architektur: {{.Architecture}}  Revision: {{index .Config.Labels "org.opencontainers.image.revision"}}'
         echo "Größe auf dem Host:"
         docker images "$IMAGE_NAME" 
         ;;
