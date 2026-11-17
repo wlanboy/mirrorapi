@@ -13,7 +13,7 @@ anyio==4.16.0
     #   watchfiles
 click==8.5.1
     # via uvicorn
-fastapi==0.163.1
+fastapi==0.163.2
     # via mirrorapi
 greenlet==3.5.6
     # via sqlalchemy
@@ -33,13 +33,12 @@ python-dotenv==1.2.4
     # via uvicorn
 pyyaml==6.0.3
     # via uvicorn
-sqlalchemy==2.1.8
+sqlalchemy==2.1.9
     # via mirrorapi
 starlette==1.10.0
     # via fastapi
 typing-extensions==4.16.0
     # via
-    #   anyio
     #   fastapi
     #   opentelemetry-api
     #   pydantic
